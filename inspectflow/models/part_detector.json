@@ -1,0 +1,62 @@
+{
+  "model": "PartNet",
+  "format": "onnx",
+  "opset": 17,
+  "sha256": "22794cfabe08acd9b0ccdfa37a634df88530a96a856c7cdfe4ff38dd54cea838",
+  "parameters": 144952,
+  "input": {
+    "width": 640,
+    "height": 320,
+    "channels": "BGR",
+    "scale": "1/255"
+  },
+  "output_stride": 8,
+  "labels": [
+    "normal",
+    "incorrect_dimensions",
+    "wrong_color",
+    "missing_feature"
+  ],
+  "training": {
+    "steps": 4000,
+    "batch_size": 32,
+    "learning_rate": 0.002,
+    "seed": 0,
+    "scene_seeds": ">= 1000",
+    "scenario": "nominal + random gain, gradients, vignetting, noise, blur",
+    "final_losses": {
+      "heatmap": 0.0004,
+      "offset": 0.0114,
+      "size": 0.0068
+    },
+    "duration_s": 494.8,
+    "device": "cuda",
+    "torch": "2.10.0+cu128",
+    "python": "3.13.11",
+    "finished_utc": "2026-10-19T17:11:23Z"
+  },
+  "validation": {
+    "seeds": [
+      100,
+      101,
+      102,
+      103,
+      104
+    ],
+    "nominal": {
+      "detection_precision": 0.9983,
+      "detection_recall": 1.0,
+      "verdict_accuracy": 1.0
+    },
+    "poor_lighting": {
+      "detection_precision": 0.997,
+      "detection_recall": 0.9998,
+      "verdict_accuracy": 1.0
+    }
+  },
+  "decode": {
+    "score_threshold": 0.4,
+    "nms_iou": 0.5,
+    "border_margin_px": 5
+  }
+}

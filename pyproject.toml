@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "inspect-flow"
-version = "0.2.0"
-description = "Computer-vision inspection replay station"
+version = "0.3.0"
+description = "Conveyor inspection with classical OpenCV rules and a small ONNX CNN, scored against ground truth"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -23,6 +23,10 @@ test = [
   "httpx2>=2.10,<3",
   "pytest>=9.0.3,<10",
   "pytest-cov>=6,<8",
+]
+train = [
+  "onnx>=1.17,<2",
+  "torch>=2.4,<3",
 ]
 dev = [
   "build>=1.2,<2",
@@ -46,6 +50,8 @@ include = ["inspectflow", "inspectflow.*"]
 
 [tool.setuptools.package-data]
 inspectflow = [
+  "models/*.onnx",
+  "models/*.json",
   "static/*",
   "static/**/*",
 ]

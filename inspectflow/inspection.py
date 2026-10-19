@@ -13,6 +13,8 @@ from .config import InspectionConfig
 class PartInspector:
     """Find colored parts and classify their first failing inspection rule."""
 
+    name = "classical"
+
     def __init__(self, config: InspectionConfig | None = None) -> None:
         self.config = InspectionConfig() if config is None else config
         if not isinstance(self.config, InspectionConfig):

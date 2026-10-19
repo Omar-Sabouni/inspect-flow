@@ -192,6 +192,119 @@ def evaluate_run(
     }
 
 
+GATE_OUTCOMES = (
+    "correct_pass",
+    "correct_reject",
+    "wrong_defect",
+    "escape",
+    "false_reject",
+    "spurious",
+)
+
+
+def evaluate_gate(
+    decisions: Sequence[Mapping[str, Any]],
+    generated_frames: Sequence[EvaluationFrame],
+    gate_x: float,
+    *,
+    iou_threshold: float = 0.3,
+) -> dict[str, Any]:
+    """Score gate decisions against the parts that actually crossed the gate.
+
+    Each decision is matched to the ground-truth part with the highest IoU in
+    its decision frame. A part counts as crossing when its true centroid moves
+    from left of ``gate_x`` to on or right of it within the run.
+
+    Outcomes per decision:
+
+    * ``correct_pass`` and ``correct_reject``: verdict and defect label right
+    * ``wrong_defect``: rejected for the wrong reason
+    * ``escape``: a defective part passed
+    * ``false_reject``: a good part rejected
+    * ``spurious``: no matching part, or a second decision for the same part
+
+    A crossing part with no decision is ``missed``. The returned
+    ``outcomes`` list is aligned with ``decisions``.
+    """
+
+    threshold = _validate_iou_threshold(iou_threshold)
+    frames, _ = _validate_frames(generated_frames)
+    truth_by_frame = {int(frame.index): frame.ground_truth for frame in frames}
+
+    last_x: dict[str, float] = {}
+    crossing: dict[str, Mapping[str, Any]] = {}
+    for frame in sorted(frames, key=lambda item: int(item.index)):
+        for item in frame.ground_truth:
+            part_id = str(item.get("part_id"))
+            current = float(item["centroid"][0])
+            previous = last_x.get(part_id)
+            if previous is not None and previous < gate_x <= current:
+                crossing.setdefault(part_id, item)
+            last_x[part_id] = current
+
+    counts = {outcome: 0 for outcome in GATE_OUTCOMES}
+    outcomes: list[dict[str, Any]] = []
+    inspected: dict[str, Mapping[str, Any]] = dict(crossing)
+    matched: set[str] = set()
+    for decision in decisions:
+        frame_index = int(decision["decision_frame"])
+        candidates = truth_by_frame.get(frame_index, [])
+        best: Mapping[str, Any] | None = None
+        best_iou = threshold
+        decision_box = _bbox(decision)
+        for item in candidates:
+            score = _iou(_bbox(item), decision_box)
+            if score >= best_iou:
+                best, best_iou = item, score
+        if best is None or str(best.get("part_id")) in matched:
+            outcome = "spurious"
+            part_id = "" if best is None else str(best.get("part_id"))
+            truth_label = "" if best is None else _truth_label(best)
+        else:
+            part_id = str(best.get("part_id"))
+            matched.add(part_id)
+            inspected.setdefault(part_id, best)
+            truth_label = _truth_label(best)
+            predicted = _prediction_label(decision)
+            if truth_label == "normal":
+                outcome = "correct_pass" if predicted == "normal" else "false_reject"
+            elif predicted == "normal":
+                outcome = "escape"
+            elif predicted == truth_label:
+                outcome = "correct_reject"
+            else:
+                outcome = "wrong_defect"
+        counts[outcome] += 1
+        outcomes.append(
+            {
+                "truth_part_id": part_id,
+                "truth_defect": truth_label,
+                "outcome": outcome,
+            }
+        )
+
+    good_parts = sum(_truth_label(item) == "normal" for item in inspected.values())
+    defective_parts = len(inspected) - good_parts
+    missed = [part_id for part_id in crossing if part_id not in matched]
+    correct_verdicts = (
+        counts["correct_pass"] + counts["correct_reject"] + counts["wrong_defect"]
+    )
+    return {
+        "gate_x": float(gate_x),
+        "iou_threshold": threshold,
+        "parts": len(inspected),
+        "good_parts": good_parts,
+        "defective_parts": defective_parts,
+        "decisions": len(decisions),
+        "counts": {**counts, "missed": len(missed)},
+        "verdict_accuracy": _rounded(_safe_ratio(correct_verdicts, len(inspected))),
+        "escape_rate": _rounded(_safe_ratio(counts["escape"], defective_parts)),
+        "false_reject_rate": _rounded(_safe_ratio(counts["false_reject"], good_parts)),
+        "miss_rate": _rounded(_safe_ratio(len(missed), len(inspected))),
+        "outcomes": outcomes,
+    }
+
+
 def _validate_iou_threshold(value: float) -> float:
     if (
         isinstance(value, bool)

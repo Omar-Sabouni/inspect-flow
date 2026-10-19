@@ -35,7 +35,11 @@ def _wait_for_ready(url: str, process: subprocess.Popen[str]) -> None:
         try:
             with urlopen(url, timeout=1) as response:  # noqa: S310 - loopback only
                 payload = json.load(response)
-            if payload == {"status": "ready", "dashboard": "available"}:
+            if payload == {
+                "status": "ready",
+                "dashboard": "available",
+                "cnn_model": "available",
+            }:
                 return
         except (OSError, URLError, ValueError) as exc:
             last_error = exc
@@ -97,7 +101,10 @@ def main() -> None:
                     "assert callable(app.create_app); "
                     "assert (root / 'index.html').is_file(); "
                     "assert (root / 'styles.css').is_file(); "
-                    "assert (root / 'app.js').is_file()"
+                    "assert (root / 'app.js').is_file(); "
+                    "model = files('inspectflow') / 'models'; "
+                    "assert (model / 'part_detector.onnx').is_file(); "
+                    "assert (model / 'part_detector.json').is_file()"
                 ),
             ],
             cwd=temp,

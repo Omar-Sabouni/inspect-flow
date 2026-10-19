@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterator, Literal
 
 import cv2
@@ -33,11 +33,17 @@ class FrameGroundTruth:
 
 @dataclass(slots=True)
 class GeneratedFrame:
-    """One synthetic BGR frame and its visible, fully inspectable parts."""
+    """One synthetic BGR frame and its visible, fully inspectable parts.
+
+    ``partial_boxes`` lists parts that are drawn but cut off by, or too close
+    to, the frame edge. They are not ground truth; detector training uses them
+    as regions where neither a detection nor its absence is penalized.
+    """
 
     index: int
     image: np.ndarray
     ground_truth: list[dict[str, Any]]
+    partial_boxes: list[list[int]] = field(default_factory=list)
 
     def to_dict(self, *, include_image: bool = False) -> dict[str, Any]:
         """Return serializable frame metadata, optionally with pixels as lists."""
@@ -79,18 +85,28 @@ class SyntheticConveyor:
     deterministic. ``generate`` remains as the eager compatibility helper.
     ``poor_lighting`` uses the same part schedule and labels as ``nominal`` while
     adding strong illumination gradients, blur and sensor noise.
+
+    The seed controls the part schedule. Labels are dealt in blocks of four,
+    one of each class in random order, so classes stay balanced without a
+    fixed sequence. Good parts vary by a few pixels in size and color, defect
+    shape and color are drawn from small sets, and spawn times jitter by one
+    frame so a part's position does not follow from the frame index alone.
     """
 
     VALID_SCENARIOS = ("nominal", "poor_lighting")
-    DEFECT_SEQUENCE: tuple[DefectLabel, ...] = (
+    DEFECT_LABELS: tuple[DefectLabel, ...] = (
         "normal",
         "incorrect_dimensions",
         "wrong_color",
         "missing_feature",
     )
     NORMAL_COLOR_BGR = (70, 170, 225)
-    WRONG_COLOR_BGR = (205, 80, 75)
+    WRONG_COLORS_BGR = ((205, 80, 75), (80, 170, 60), (170, 70, 160))
     NORMAL_SIZE = (80, 50)
+    # Every shape is at least 25% off nominal on one axis, well beyond the
+    # default 18% tolerance. Widths stay at or below 104 px so neighbouring
+    # parts never touch.
+    WRONG_SIZES = ((104, 36), (60, 50), (80, 66), (100, 60))
 
     def __init__(
         self,
@@ -140,19 +156,21 @@ class SyntheticConveyor:
         for frame_index in range(self.frame_count):
             image = self._draw_background(frame_index)
             truth: list[dict[str, Any]] = []
+            partial: list[list[int]] = []
             for spec in parts:
                 x = -spec.width + spec.speed * (frame_index - spec.spawn_frame)
                 if x + spec.width <= 0 or x >= self.width:
                     continue
                 self._draw_part(image, x, spec)
+                bbox = [int(x), int(spec.y), int(spec.width), int(spec.height)]
                 # Border fragments are intentionally excluded from both the
                 # inspectable ground truth and detector output.
                 # Blur and morphology expand a colored silhouette by roughly
                 # two pixels, so retain extra clearance beyond the detector's
                 # configured border margin.
                 if x < 6 or x + spec.width > self.width - 6:
+                    partial.append(bbox)
                     continue
-                bbox = [int(x), int(spec.y), int(spec.width), int(spec.height)]
                 truth.append(
                     {
                         "part_id": spec.part_id,
@@ -168,7 +186,7 @@ class SyntheticConveyor:
 
             if self.scenario == "poor_lighting":
                 image = self._degrade(image, frame_index, rng)
-            yield GeneratedFrame(frame_index, image, truth)
+            yield GeneratedFrame(frame_index, image, truth, partial)
 
     def _build_schedule(self, rng: np.random.Generator) -> list[_PartSpec]:
         speed = max(4, round(self.width / 92))
@@ -180,18 +198,29 @@ class SyntheticConveyor:
         belt_bottom = round(self.height * 0.84)
 
         parts: list[_PartSpec] = []
-        for index in range(count):
-            defect = self.DEFECT_SEQUENCE[index % len(self.DEFECT_SEQUENCE)]
+        labels: list[DefectLabel] = []
+        while len(labels) < count:
+            order = rng.permutation(len(self.DEFECT_LABELS))
+            labels.extend(self.DEFECT_LABELS[int(position)] for position in order)
+        for index, defect in enumerate(labels[:count]):
             if defect == "incorrect_dimensions":
-                # Both axes sit clearly outside the default tolerance.
-                part_width, part_height = 104, 36
+                choice = int(rng.integers(len(self.WRONG_SIZES)))
+                part_width, part_height = self.WRONG_SIZES[choice]
             else:
-                part_width, part_height = self.NORMAL_SIZE
-            color = (
-                self.WRONG_COLOR_BGR
-                if defect == "wrong_color"
-                else self.NORMAL_COLOR_BGR
-            )
+                part_width = self.NORMAL_SIZE[0] + int(rng.integers(-3, 4))
+                part_height = self.NORMAL_SIZE[1] + int(rng.integers(-2, 3))
+            if defect == "wrong_color":
+                color = self.WRONG_COLORS_BGR[
+                    int(rng.integers(len(self.WRONG_COLORS_BGR)))
+                ]
+            else:
+                shift = rng.integers(-6, 7, size=3)
+                color = (
+                    int(self.NORMAL_COLOR_BGR[0] + shift[0]),
+                    int(self.NORMAL_COLOR_BGR[1] + shift[1]),
+                    int(self.NORMAL_COLOR_BGR[2] + shift[2]),
+                )
+            jitter = int(rng.integers(-1, 2))
             center_y = int(
                 rng.integers(
                     belt_top + part_height // 2 + 8,
@@ -202,7 +231,7 @@ class SyntheticConveyor:
                 _PartSpec(
                     part_id=f"part-{index + 1:03d}",
                     defect=defect,
-                    spawn_frame=index * spacing_frames - lead_frames,
+                    spawn_frame=index * spacing_frames - lead_frames + jitter,
                     y=center_y - part_height // 2,
                     width=part_width,
                     height=part_height,

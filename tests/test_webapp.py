@@ -16,7 +16,6 @@ from inspectflow.webapp import (
     RunStore,
     ArtifactTooLargeError,
     REQUIRED_STATIC_FILES,
-    _gate_decisions,
     api_meta,
     build_run_artifact,
     create_app,
@@ -70,31 +69,6 @@ def test_run_store_rejects_invalid_limits(kwargs: dict[str, object]) -> None:
         RunStore(**kwargs)  # type: ignore[arg-type]
 
 
-def test_gate_decisions_require_a_confirmed_left_to_right_crossing() -> None:
-    observations = {
-        1: [
-            {"frame_index": 1, "centroid": [90, 20]},
-            {"frame_index": 2, "centroid": [105, 20]},
-            {"frame_index": 3, "centroid": [120, 20]},
-        ],
-        2: [{"frame_index": 2, "centroid": [130, 20]}],
-        3: [
-            {"frame_index": 1, "centroid": [50, 20]},
-            {"frame_index": 2, "centroid": [80, 20]},
-        ],
-        4: [
-            {"frame_index": 1, "centroid": [130, 20]},
-            {"frame_index": 2, "centroid": [90, 20]},
-        ],
-    }
-
-    decisions = _gate_decisions(observations, gate_x=100)
-
-    assert [(item["track_id"], item["decision_frame"]) for item in decisions] == [
-        (1, 2)
-    ]
-
-
 def test_default_run_uses_streaming_and_emits_typed_gate_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -109,22 +83,34 @@ def test_default_run_uses_streaming_and_emits_typed_gate_results(
     artifact = build_run_artifact(seed=7, frame_count=96, scenario="nominal")
     payload = RunResponse.model_validate(artifact.payload)
 
-    assert payload.summary.accepted == 2
-    assert payload.summary.rejected == 3
+    assert payload.detector == "classical"
+    assert payload.summary.accepted == 1
+    assert payload.summary.rejected == 4
     assert payload.summary.total_inspected == 5
     assert payload.summary.observed_tracks == 5
     assert payload.summary.undecided_tracks == 0
     assert payload.summary.defect_counts == {
         "incorrect_dimensions": 1,
         "wrong_color": 1,
-        "missing_feature": 1,
+        "missing_feature": 2,
     }
-    assert payload.frames[-1].accepted == 2
-    assert payload.frames[-1].rejected == 3
+    assert payload.frames[-1].accepted == 1
+    assert payload.frames[-1].rejected == 4
+
+    gate = payload.evaluation.gate
+    assert gate.parts == 5
+    assert gate.counts.correct_pass == 1
+    assert gate.counts.correct_reject == 4
+    assert gate.escape_rate == 0.0
+    assert payload.evaluation.frames.detection.recall == 1.0
+    assert set(payload.timing.stages) == {"detect", "track", "annotate", "encode"}
+    assert payload.timing.inspection_fps is not None
 
     rows = list(csv.DictReader(io.StringIO(artifact.csv_text)))
     assert len(rows) == 5
     assert {int(row["track_id"]) for row in rows} == {1, 2, 3, 4, 5}
+    assert {row["outcome"] for row in rows} == {"correct_pass", "correct_reject"}
+    assert all(row["truth_part_id"].startswith("part-") for row in rows)
 
 
 def test_meta_and_openapi_publish_defaults_and_real_media_types() -> None:
@@ -160,11 +146,25 @@ def test_readiness_requires_every_browser_module(
         asset.parent.mkdir(parents=True, exist_ok=True)
         asset.write_text("ok", encoding="utf-8")
     monkeypatch.setattr(webapp, "STATIC_DIR", static_dir)
+    model = tmp_path / "part_detector.onnx"
+    model.write_bytes(b"onnx")
+    monkeypatch.setattr(webapp, "default_model_path", lambda: model)
 
     response = Response()
     assert asyncio.run(readiness(response))["status"] == "ready"
     assert response.status_code == 200
 
+    model.unlink()
+    response = Response()
+    report = asyncio.run(readiness(response))
+    assert report == {
+        "status": "not_ready",
+        "dashboard": "available",
+        "cnn_model": "unavailable",
+    }
+    assert response.status_code == 503
+
+    model.write_bytes(b"onnx")
     (static_dir / "playback.js").unlink()
     response = Response()
     assert asyncio.run(readiness(response))["status"] == "not_ready"

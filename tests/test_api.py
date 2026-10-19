@@ -48,7 +48,11 @@ def test_health_and_main_browser_application(client: TestClient) -> None:
 
     ready = client.get("/api/ready")
     assert ready.status_code == 200
-    assert ready.json() == {"status": "ready", "dashboard": "available"}
+    assert ready.json() == {
+        "status": "ready",
+        "dashboard": "available",
+        "cnn_model": "available",
+    }
 
     metadata = client.get("/api/meta")
     assert metadata.status_code == 200
