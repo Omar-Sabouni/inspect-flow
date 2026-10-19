@@ -33,22 +33,22 @@ export function drawDefectChart(canvas, counts) {
   const chartWidth = Math.max(1, width - padding.left - padding.right);
   const chartHeight = Math.max(1, height - padding.top - padding.bottom);
   const values = [counts.dimensions, counts.color, counts.feature].map((value) => strictNumber(value, { min: 0 }) ?? 0);
-  const colors = ["#003f6b", "#005a96", "#b7d600"];
-  const labels = ["Dimensions", "Color", "Feature"];
+  const colors = ["#2F5D8A", "#B5532A", "#5E7A1F"];
+  const labels = ["Size", "Color", "Hole"];
   const maximum = Math.max(4, ...values);
   const gridMaximum = Math.ceil(maximum / 2) * 2;
 
-  context.font = "11px Tahoma, Geneva, Arial, sans-serif";
+  context.font = "500 12px Barlow, \"Segoe UI\", sans-serif";
   context.textBaseline = "middle";
   context.lineWidth = 1;
   for (let line = 0; line <= 4; line += 1) {
     const y = padding.top + chartHeight * line / 4;
-    context.strokeStyle = "#9ba8ae";
+    context.strokeStyle = "#D3D9DE";
     context.beginPath();
     context.moveTo(padding.left, y + 0.5);
     context.lineTo(width - padding.right, y + 0.5);
     context.stroke();
-    context.fillStyle = "#35434b";
+    context.fillStyle = "#56626C";
     context.textAlign = "right";
     context.fillText(String(Math.round(gridMaximum * (1 - line / 4))), padding.left - 7, y);
   }
@@ -61,11 +61,11 @@ export function drawDefectChart(canvas, counts) {
     const y = padding.top + chartHeight - barHeight;
     context.fillStyle = colors[index];
     context.fillRect(x, y, barWidth, Math.max(1, barHeight));
-    context.fillStyle = "#11171b";
+    context.fillStyle = "#1A2127";
     context.textAlign = "center";
     context.textBaseline = "bottom";
     context.fillText(String(Math.round(value)), x + barWidth / 2, Math.max(12, y - 4));
-    context.fillStyle = "#35434b";
+    context.fillStyle = "#56626C";
     context.textBaseline = "top";
     context.fillText(labels[index], x + barWidth / 2, padding.top + chartHeight + 10);
   });

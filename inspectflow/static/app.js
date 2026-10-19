@@ -34,6 +34,13 @@ const elementIds = [
   "scoreMissed", "scoreRecall", "scoreLatency",
 ];
 
+const DEFECT_NAMES = {
+  normal: "none",
+  incorrect_dimensions: "wrong size",
+  wrong_color: "wrong color",
+  missing_feature: "no hole",
+};
+
 const el = {};
 const state = {
   activeRun: null,
@@ -275,17 +282,17 @@ function updateSettingsState() {
   try {
     const fingerprint = payloadFingerprint(readPayload());
     if (!state.appliedFingerprint) {
-      el.settingsState.textContent = "Draft settings have not been run.";
+      el.settingsState.textContent = "Not run yet.";
       el.settingsState.classList.add("dirty");
     } else if (fingerprint === state.appliedFingerprint) {
-      el.settingsState.textContent = "Draft settings match the last completed request.";
+      el.settingsState.textContent = "Showing these settings.";
       el.settingsState.classList.remove("dirty");
     } else {
-      el.settingsState.textContent = "Unapplied changes — run or compare to use these settings.";
+      el.settingsState.textContent = "Changed since the last run.";
       el.settingsState.classList.add("dirty");
     }
   } catch (_error) {
-    el.settingsState.textContent = "Draft settings need attention.";
+    el.settingsState.textContent = "Check the settings above.";
     el.settingsState.classList.add("dirty");
   }
 }
@@ -314,7 +321,7 @@ async function startSingleRun(options = {}) {
     if (requestNumber !== state.requestSerial) return;
     showFormError(operationError(error), !options.initial);
     setSystemStatus("error", "Run failed");
-    announce("Inspection run failed. The previous completed result remains available.");
+    announce("The run failed. The previous run is still shown.");
   } finally {
     if (requestNumber === state.requestSerial) {
       setBusy(false);
@@ -349,12 +356,12 @@ async function startComparison() {
   renderComparison();
   try {
     if (!state.comparison.nominal) {
-      setComparisonProgress("Generating nominal run (1 of 2)…");
+      setComparisonProgress("Running normal light (1 of 2)…");
       state.comparison.nominal = await requestComparisonRun(draft, "nominal", requestNumber);
       renderComparison();
     }
     if (!state.comparison.poor_lighting) {
-      setComparisonProgress("Nominal complete. Generating poor-lighting run (2 of 2)…");
+      setComparisonProgress("Running poor light (2 of 2)…");
       state.comparison.poor_lighting = await requestComparisonRun(draft, "poor_lighting", requestNumber);
       renderComparison();
     }
@@ -362,25 +369,25 @@ async function startComparison() {
     state.appliedFingerprint = payloadFingerprint(draft);
     selectedRun = state.comparison.poor_lighting;
     completed = true;
-    setComparisonProgress("Comparison complete. Showing the poor-lighting replay.");
+    setComparisonProgress("Both runs finished. Showing poor light.");
     firstFrameReady = await activateRun(selectedRun);
     if (firstFrameReady) {
       setSystemStatus("ready", "Comparison ready");
-      announce("Condition comparison complete. Poor-lighting result selected.");
+      announce("Both runs finished. Showing poor light.");
     } else {
-      announce("Condition comparison complete, but the selected poor-lighting frame is unavailable.");
+      announce("Both runs finished, but the first poor-light frame did not load.");
     }
   } catch (error) {
     if (requestNumber !== state.requestSerial) return;
     const hasNominal = Boolean(state.comparison.nominal);
     state.comparison.status = hasNominal ? "partial" : "error";
     selectedRun = hasNominal ? state.comparison.nominal : null;
-    const suffix = hasNominal ? " The nominal result is available; use Compare conditions to retry poor lighting." : " The previous completed result remains available.";
+    const suffix = hasNominal ? " The normal-light run finished. Select Retry poor light to try again." : " The previous run is still shown.";
     showFormError(`${operationError(error)}${suffix}`, true);
-    setComparisonProgress(hasNominal ? "Comparison incomplete · nominal result retained." : "Comparison failed · no new result was selected.");
+    setComparisonProgress(hasNominal ? "Only the normal-light run finished." : "The comparison failed.");
     if (selectedRun) firstFrameReady = await activateRun(selectedRun);
     setSystemStatus("error", hasNominal ? "Comparison incomplete" : "Comparison failed");
-    announce(hasNominal ? "Comparison incomplete. Nominal result selected." : "Condition comparison failed.");
+    announce(hasNominal ? "Only the normal-light run finished. Showing it." : "The comparison failed.");
   } finally {
     if (requestNumber === state.requestSerial) {
       renderComparison();
@@ -414,8 +421,8 @@ async function activateRun(run) {
   updateResultContext(true);
   el.frameImage.classList.remove("loaded");
   el.framePlaceholder.classList.remove("hidden");
-  el.framePlaceholder.querySelector("strong").textContent = "Loading completed run";
-  el.framePlaceholder.querySelector("small").textContent = "Decoding the first replay frame";
+  el.framePlaceholder.querySelector("strong").textContent = "Loading the run";
+  el.framePlaceholder.querySelector("small").textContent = "Fetching the first frame";
   el.viewport.setAttribute("aria-busy", "true");
   drawDefectChart(el.defectChart, { dimensions: 0, color: 0, feature: 0 });
   return playback.setRun(run, { autoplay: false });
@@ -428,14 +435,14 @@ function populateRunMetadata(run) {
   el.frameScrubber.max = String(run.frames.length - 1);
   el.frameScrubber.value = "0";
   el.frameScrubber.style.setProperty("--progress", "0%");
-  el.modeReadout.textContent = run.scenario === "poor_lighting" ? "Poor lighting" : "Nominal";
+  el.modeReadout.textContent = scenarioLabel(run.scenario);
   el.resolutionReadout.textContent = `${run.image_width} × ${run.image_height}`;
   el.viewport.style.aspectRatio = `${run.image_width} / ${run.image_height}`;
   el.scenarioFlag.hidden = run.scenario !== "poor_lighting";
   el.failureNote.hidden = run.scenario !== "poor_lighting";
   el.failureNoteText.textContent = run.detector === "cnn"
-    ? "The CNN never saw this spotlight lighting during training. Run the same scene with the classical rules to see where fixed thresholds fail."
-    : "The color threshold is absolute, so dimming pushes most parts past it and the rules reject them as wrong color. Parts in the darkest regions are not segmented at all. Run the same scene with the CNN detector to compare.";
+    ? "The CNN was trained without this spotlight. Run the same scene with the classical rules to see where fixed thresholds break."
+    : "The color check uses a fixed threshold, so dimming pushes most parts past it and the rules reject them as the wrong color. Parts in the darkest stretch of belt are not found at all. Run the same scene with the CNN to compare.";
   configureExport(el.csvExportButton, run.exports.csv_url, "inspectflow-decisions.csv");
   renderScores(run);
 }
@@ -456,14 +463,20 @@ function renderScores(run) {
   el.scoreRecall.textContent = formatPercent(detection.recall);
   const p50 = strictNumber(detect.p50_ms, { min: 0 });
   const p95 = strictNumber(detect.p95_ms, { min: 0 });
-  el.scoreLatency.textContent = p50 === null || p95 === null ? "—" : `${p50.toFixed(1)} / ${p95.toFixed(1)} ms`;
+  if (p50 === null || p95 === null) {
+    el.scoreLatency.textContent = "—";
+  } else {
+    const tail = document.createElement("small");
+    tail.textContent = `95th percentile ${p95.toFixed(1)} ms`;
+    el.scoreLatency.replaceChildren(`${p50.toFixed(1)} ms`, tail);
+  }
   el.scoreEscapes.parentElement.classList.toggle("flagged", (strictNumber(counts.escape, { min: 0 }) ?? 0) > 0);
   el.scoreFalseRejects.parentElement.classList.toggle("flagged", (strictNumber(counts.false_reject, { min: 0 }) ?? 0) > 0);
 
   const parts = strictNumber(gate.parts, { min: 0, integer: true });
   el.scoreContext.textContent = parts === null
-    ? "This run has no ground-truth evaluation."
-    : `${scenarioLabel(run.scenario)} · ${detectorLabel(run.detector)} · ${parts} part${parts === 1 ? "" : "s"} reached the gate in ${run.frames.length} frames.`;
+    ? "This run has no ground truth to check against."
+    : `${parts} part${parts === 1 ? "" : "s"} reached the gate in ${run.frames.length} frames. Each decision is checked against the part's true label.`;
 }
 
 function countOf(value, total) {
@@ -493,7 +506,7 @@ function configureExport(anchor, rawUrl, filename) {
 function renderCommittedFrame(frame, index) {
   if (!state.activeRun) return;
   el.frameImage.classList.add("loaded");
-  el.frameImage.alt = `${scenarioLabel(state.activeRun.scenario)} completed run, frame ${index + 1} of ${state.activeRun.frames.length}`;
+  el.frameImage.alt = `${detectorLabel(state.activeRun.detector)} in ${scenarioLabel(state.activeRun.scenario).toLowerCase()}, frame ${index + 1} of ${state.activeRun.frames.length}`;
   el.framePlaceholder.classList.add("hidden");
   el.viewport.setAttribute("aria-busy", "false");
   if (!state.busy && el.systemState.classList.contains("error")) {
@@ -530,7 +543,7 @@ function renderCommittedFrame(frame, index) {
 function renderDetectionLog(frame) {
   const detections = Array.isArray(frame.detections) ? frame.detections : [];
   el.detectionLogBody.replaceChildren();
-  el.detectionLogStatus.textContent = `${detections.length} detection${detections.length === 1 ? "" : "s"}`;
+  el.detectionLogStatus.textContent = `${detections.length} part${detections.length === 1 ? "" : "s"}`;
 
   if (!detections.length) {
     const row = document.createElement("tr");
@@ -546,21 +559,19 @@ function renderDetectionLog(frame) {
   for (const rawDetection of detections) {
     const detection = isRecord(rawDetection) ? rawDetection : {};
     const measurements = isRecord(detection.measurements) ? detection.measurements : {};
-    const verdict = detection.verdict === "pass" ? "PASS" : detection.verdict === "fail" ? "REJECT" : "—";
-    const predicted = typeof detection.predicted_defect === "string"
-      ? detection.predicted_defect.replaceAll("_", " ")
-      : "—";
+    const verdict = detection.verdict === "pass" ? "Pass" : detection.verdict === "fail" ? "Reject" : "—";
+    const predicted = DEFECT_NAMES[detection.predicted_defect] || "—";
     const width = formatLogNumber(measurements.width_px, 0);
     const height = formatLogNumber(measurements.height_px, 0);
     const row = document.createElement("tr");
     row.append(
       logCell(formatLogNumber(detection.track_id, 0), "", "Track"),
-      logCell(verdict, verdict === "PASS" ? "decision-pass" : verdict === "REJECT" ? "decision-fail" : "", "Decision"),
-      logCell(predicted, "", "Class"),
+      logCell(verdict, verdict === "Pass" ? "decision-pass" : verdict === "Reject" ? "decision-fail" : "", "Decision"),
+      logCell(predicted, "", "Defect"),
       logCell(width === "—" || height === "—" ? "—" : `${width} × ${height}`, "", "W × H"),
       logCell(formatLogNumber(measurements.contour_area_px, 0), "", "Area"),
       logCell(formatLogNumber(measurements.color_distance, 1), "", "Color Δ"),
-      logCell(formatLogNumber(measurements.feature_radius_px, 1), "", "Feature r"),
+      logCell(formatLogNumber(measurements.feature_radius_px, 1), "", "Hole r"),
     );
     el.detectionLogBody.append(row);
   }
@@ -587,19 +598,19 @@ function handleFrameError(error) {
   el.framePlaceholder.querySelector("small").textContent = error instanceof Error ? error.message : "The generated frame could not be loaded";
   el.viewport.setAttribute("aria-busy", "false");
   setSystemStatus("error", "Frame unavailable");
-  announce("The selected replay frame could not be loaded. Frame telemetry was not changed.");
+  announce("This frame did not load. Move the scrubber to try again.");
 }
 
 function handlePlaybackChange(playing, reason) {
   el.playPauseButton.classList.toggle("playing", playing);
   el.playPauseButton.classList.toggle("paused", !playing);
-  el.playPauseButton.setAttribute("aria-label", playing ? "Pause completed run replay" : "Play completed run replay");
+  el.playPauseButton.setAttribute("aria-label", playing ? "Pause" : "Play");
   el.playPauseButton.setAttribute("aria-pressed", String(playing));
   el.viewport.classList.toggle("playing", playing);
   if (playing) setSystemStatus("playing", "Replay playing");
   else if (reason === "complete") {
     setSystemStatus("ready", "Replay complete");
-    announce("Completed run replay finished.");
+    announce("Replay finished.");
   } else if (!state.busy && state.activeRun && !["switch", "error"].includes(reason)) {
     setSystemStatus("ready", "Replay paused");
   }
@@ -642,16 +653,16 @@ function renderComparison() {
   el.comparisonTableWrap.hidden = !hasResult;
   if (hasResult) renderComparisonTable(el.comparisonTableBody, nominal, poor);
   if (state.comparison.status === "complete") {
-    el.comparisonStatus.textContent = "Same inspection settings";
+    el.comparisonStatus.textContent = "Same settings for both";
     el.comparisonPanel.open = true;
   } else if (state.comparison.status === "running") {
-    el.comparisonStatus.textContent = nominal ? "1 of 2 complete" : "Generating…";
+    el.comparisonStatus.textContent = nominal ? "1 of 2 finished" : "Running…";
   } else if (state.comparison.status === "partial") {
-    el.comparisonStatus.textContent = "Partial · poor lighting unavailable";
+    el.comparisonStatus.textContent = "Poor light run failed";
   } else if (state.comparison.status === "error") {
-    el.comparisonStatus.textContent = "Comparison unavailable";
+    el.comparisonStatus.textContent = "Comparison failed";
   } else {
-    el.comparisonStatus.textContent = "Run both conditions";
+    el.comparisonStatus.textContent = "Not run yet";
   }
   updateResultSwitcher();
 }
@@ -665,7 +676,7 @@ function updateResultSwitcher() {
   el.resultNominalButton.setAttribute("aria-pressed", String(Boolean(nominal && state.activeRun === nominal)));
   el.resultPoorButton.setAttribute("aria-pressed", String(Boolean(poor && state.activeRun === poor)));
   const hasNominal = Boolean(nominal);
-  el.compareNominalButton.innerHTML = hasNominal ? "View nominal result <span>→</span>" : "Compare with nominal <span>→</span>";
+  el.compareNominalButton.textContent = hasNominal ? "Show normal light" : "Compare with normal light";
 }
 
 function setComparisonProgress(message) {
@@ -678,15 +689,15 @@ function setBusy(busy) {
   playback.setBusy(state.busy);
   for (const control of el.runForm.elements) control.disabled = state.busy;
   el.runButton.classList.toggle("loading", state.busy && state.operation === "single");
-  el.runButton.querySelector(".button-label span").textContent = state.busy && state.operation === "single" ? "Generating run…" : "Run inspection";
+  el.runButton.querySelector(".button-label span").textContent = state.busy && state.operation === "single" ? "Running…" : "Run inspection";
   el.compareButton.classList.toggle("loading", state.busy && state.operation === "compare");
   el.compareButton.querySelector("span").textContent = state.busy && state.operation === "compare"
-    ? "Comparing conditions…"
-    : state.comparison.status === "partial" ? "Retry poor lighting" : "Compare conditions";
+    ? "Running both…"
+    : state.comparison.status === "partial" ? "Retry poor light" : "Compare lighting";
   if (state.busy) {
-    setSystemStatus("busy", state.operation === "compare" ? "Comparing conditions" : "Processing run");
-    if (state.activeRun) el.resultContext.textContent = "Generating new output · previous result remains selected.";
-    else el.resultContext.textContent = "Generating the first completed run…";
+    setSystemStatus("busy", state.operation === "compare" ? "Running both scenes" : "Running");
+    if (state.activeRun) el.resultContext.textContent = "Running. The previous run stays on screen.";
+    else el.resultContext.textContent = "Running the first inspection…";
   }
   updateTransportAvailability();
   updateResultSwitcher();
@@ -702,10 +713,10 @@ function updateTransportAvailability() {
 function updateResultContext(force = false) {
   if (state.busy && !force) return;
   if (!state.activeRun) {
-    el.resultContext.textContent = "No completed run selected.";
+    el.resultContext.textContent = "No run yet.";
     return;
   }
-  el.resultContext.textContent = `${scenarioLabel(state.activeRun.scenario)} · ${detectorLabel(state.activeRun.detector)} · completed result`;
+  el.resultContext.textContent = `${detectorLabel(state.activeRun.detector)} in ${scenarioLabel(state.activeRun.scenario).toLowerCase()}`;
 }
 
 function setSystemStatus(kind, text) {
@@ -731,7 +742,7 @@ function showFormError(message, focus = true) {
 }
 
 function scenarioLabel(scenario) {
-  return scenario === "poor_lighting" ? "Poor lighting" : "Nominal";
+  return scenario === "poor_lighting" ? "Poor light" : "Normal light";
 }
 
 function detectorLabel(detector) {

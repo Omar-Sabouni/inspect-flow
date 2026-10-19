@@ -58,18 +58,18 @@ export const STATIC_META = Object.freeze({
 
 // Paths start at the run object. "better" sets the color of the delta column.
 export const METRIC_DEFINITIONS = Object.freeze([
-  { label: "Gate verdict accuracy", path: ["evaluation", "gate", "verdict_accuracy"], format: "percent", better: "higher" },
-  { label: "Escapes (defect passed)", path: ["evaluation", "gate", "counts", "escape"], format: "count", better: "lower" },
-  { label: "False rejects", path: ["evaluation", "gate", "counts", "false_reject"], format: "count", better: "lower" },
-  { label: "Missed at gate", path: ["evaluation", "gate", "counts", "missed"], format: "count", better: "lower" },
+  { label: "Right call", path: ["evaluation", "gate", "verdict_accuracy"], format: "percent", better: "higher" },
+  { label: "Defects passed", path: ["evaluation", "gate", "counts", "escape"], format: "count", better: "lower" },
+  { label: "Good parts rejected", path: ["evaluation", "gate", "counts", "false_reject"], format: "count", better: "lower" },
+  { label: "Parts missed", path: ["evaluation", "gate", "counts", "missed"], format: "count", better: "lower" },
   { label: "Detection recall", path: ["evaluation", "frames", "detection", "recall"], format: "percent", better: "higher" },
-  { label: "Accepted at gate", path: ["summary", "accepted"], format: "count", better: "neutral" },
-  { label: "Rejected at gate", path: ["summary", "rejected"], format: "count", better: "neutral" },
-  { label: "Undecided tracks", path: ["summary", "undecided_tracks"], format: "count", better: "lower" },
-  { label: "Dimension rejects", path: ["summary", "defect_counts", "incorrect_dimensions"], format: "count", better: "neutral" },
-  { label: "Color rejects", path: ["summary", "defect_counts", "wrong_color"], format: "count", better: "neutral" },
-  { label: "Feature rejects", path: ["summary", "defect_counts", "missing_feature"], format: "count", better: "neutral" },
-  { label: "Detect time p50", path: ["timing", "stages", "detect", "p50_ms"], format: "ms", better: "lower" },
+  { label: "Passed", path: ["summary", "accepted"], format: "count", better: "neutral" },
+  { label: "Rejected", path: ["summary", "rejected"], format: "count", better: "neutral" },
+  { label: "Tracks with no decision", path: ["summary", "undecided_tracks"], format: "count", better: "lower" },
+  { label: "Rejected for size", path: ["summary", "defect_counts", "incorrect_dimensions"], format: "count", better: "neutral" },
+  { label: "Rejected for color", path: ["summary", "defect_counts", "wrong_color"], format: "count", better: "neutral" },
+  { label: "Rejected for hole", path: ["summary", "defect_counts", "missing_feature"], format: "count", better: "neutral" },
+  { label: "Time per frame (median)", path: ["timing", "stages", "detect", "p50_ms"], format: "ms", better: "lower" },
 ]);
 
 export function isRecord(value) {

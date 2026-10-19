@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 async function waitForRun(page) {
-  await expect(page.locator("#resultContext")).toContainText("completed result", {
+  await expect(page.locator("#resultContext")).toHaveText(/ in (normal|poor) light$/, {
     timeout: 90_000,
   });
   await expect(page.locator("#playPauseButton")).toBeEnabled();
@@ -35,9 +35,9 @@ test("initial run is a keyboard-controllable completed replay", async ({ page })
   await page.goto("/");
   await waitForRun(page);
 
-  await expect(page.locator("#modeReadout")).toHaveText("Nominal");
+  await expect(page.locator("#modeReadout")).toHaveText("Normal light");
   await expect(page.locator("#analyticsCaption")).toContainText(
-    "selected replay frame",
+    "frame on screen",
   );
   await expect(page.locator("#csvExportButton")).toHaveAttribute(
     "href",
@@ -54,7 +54,7 @@ test("initial run is a keyboard-controllable completed replay", async ({ page })
   await expect(page.locator("#settingsState")).toContainText(/unapplied|changed/i);
 
   await page.locator("#frameScrubber").fill("36");
-  await expect(page.locator("#detectionLogStatus")).not.toHaveText("0 detections");
+  await expect(page.locator("#detectionLogStatus")).not.toHaveText("0 parts");
   await expect(page.locator("#detectionLogBody tr")).not.toHaveCount(0);
   await expect(page.locator("#detectionLogBody .decision-pass, #detectionLogBody .decision-fail").first()).toBeVisible();
 });
@@ -79,7 +79,7 @@ test("paired comparison retains both switchable results", async ({ page }) => {
     "aria-pressed",
     "true",
   );
-  await expect(page.locator("#modeReadout")).toHaveText("Nominal");
+  await expect(page.locator("#modeReadout")).toHaveText("Normal light");
 });
 
 test("a poor-light run labels the degraded input and keeps its result available", async ({
@@ -93,7 +93,7 @@ test("a poor-light run labels the degraded input and keeps its result available"
   await page.locator("#frameCountInput").fill("16");
   await page.locator("#runButton").click();
   await expect.poll(() => page.locator("#frameImage").getAttribute("src"), { timeout: 90_000 }).not.toBe(originalFrame);
-  await expect(page.locator("#modeReadout")).toHaveText("Poor lighting");
+  await expect(page.locator("#modeReadout")).toHaveText("Poor light");
   await expect(page.locator("#scenarioFlag")).toContainText("Dim light and sensor noise");
   await expect(page.locator("#failureNote")).toBeVisible();
   await expect(page.locator("#csvExportButton")).not.toHaveAttribute("aria-disabled", "true");
@@ -123,9 +123,7 @@ test("a failed first request leaves a usable empty state and can recover", async
     { timeout: 90_000 },
   );
   await expect(page.locator("#framePlaceholder")).toBeVisible();
-  await expect(page.locator("#resultContext")).toHaveText(
-    "No completed run selected.",
-  );
+  await expect(page.locator("#resultContext")).toHaveText("No run yet.");
   await expect(page.locator("#playPauseButton")).toBeDisabled();
   await expect(page.locator("#csvExportButton")).toHaveAttribute(
     "aria-disabled",
@@ -145,7 +143,7 @@ test("an unavailable first frame keeps a recoverable error state", async ({
     await route.fulfill({ status: 404, contentType: "text/plain", body: "missing" });
   });
   await page.goto("/");
-  await expect(page.locator("#resultContext")).toContainText("completed result", { timeout: 90_000 });
+  await expect(page.locator("#resultContext")).toHaveText(/ in (normal|poor) light$/, { timeout: 90_000 });
   await expect(page.locator("#framePlaceholder strong")).toHaveText(
     "Frame unavailable",
   );
@@ -246,17 +244,17 @@ test("a CNN run on poor light reports ground-truth scores", async ({ page }) => 
   await page.goto("/");
   await waitForRun(page);
   await expect(page.locator("#scoreVerdictAccuracy")).toHaveText(/^\d+\.\d%$/);
-  await expect(page.locator("#scoreContext")).toContainText("Classical rules");
+  await expect(page.locator("#resultContext")).toHaveText("Classical rules in normal light");
 
   await page.locator('input[name="scenario"][value="poor_lighting"]').check();
   await page.locator('input[name="detector"][value="cnn"]').check();
   await page.locator("#frameCountInput").fill("48");
   await page.locator("#runButton").click();
 
-  await expect(page.locator("#resultContext")).toContainText("Poor lighting · CNN", {
+  await expect(page.locator("#resultContext")).toHaveText("CNN in poor light", {
     timeout: 90_000,
   });
-  await expect(page.locator("#scoreContext")).toContainText("CNN");
+  await expect(page.locator("#scoreContext")).toContainText("reached the gate");
   await expect(page.locator("#scoreEscapes")).toHaveText(/^\d+ of \d+$/);
   await expect(page.locator("#scoreLatency")).toHaveText(/ ms$/);
   await expectNoAxeViolations(page);

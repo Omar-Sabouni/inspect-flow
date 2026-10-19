@@ -316,6 +316,7 @@ def build_run_artifact(
                 frame_index=generated.index,
                 label=f"{scenario} {detector}",
                 gate_x=gate_x,
+                captions=False,
             )
         with pipeline.timer.measure("encode"):
             encoded_ok, encoded = cv2.imencode(

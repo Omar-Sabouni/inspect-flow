@@ -236,6 +236,15 @@ def rows_to_csv(
     return output.getvalue()
 
 
+SHORT_LABELS = {
+    "normal": "pass",
+    "incorrect_dimensions": "wrong size",
+    "wrong_color": "wrong color",
+    "missing_feature": "no hole",
+}
+GATE_BGR = (44, 199, 255)
+
+
 def annotate_frame(
     image: np.ndarray,
     detections: Sequence[Mapping[str, Any]],
@@ -243,32 +252,37 @@ def annotate_frame(
     frame_index: int,
     label: str,
     gate_x: int,
+    captions: bool = True,
 ) -> np.ndarray:
-    """Draw the gate, boxes, track IDs and verdicts on a copy of ``image``."""
+    """Draw the gate, boxes and verdicts on a copy of ``image``.
+
+    ``captions`` adds the gate name and a frame counter. The dashboard turns
+    them off because it shows both itself.
+    """
 
     canvas = image.copy()
     height, width = canvas.shape[:2]
     placed: list[tuple[int, int, int, int]] = []
     top = min(53, height // 6)
-    cv2.line(canvas, (gate_x, top), (gate_x, height - 43), (130, 187, 255), 1)
-    cv2.putText(
-        canvas,
-        "INSPECTION GATE",
-        (max(0, gate_x - 66), max(12, top - 7)),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.38,
-        (185, 216, 255),
-        1,
-        cv2.LINE_AA,
-    )
+    cv2.line(canvas, (gate_x, top), (gate_x, height - 43), GATE_BGR, 1)
+    if captions:
+        cv2.putText(
+            canvas,
+            "GATE",
+            (gate_x + 5, height - 46),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.4,
+            GATE_BGR,
+            1,
+            cv2.LINE_AA,
+        )
     for detection in detections:
         x, y, box_width, box_height = (int(value) for value in detection["bbox"])
         failed = detection["verdict"] == "fail"
         color = (72, 92, 255) if failed else (87, 214, 143)
         cv2.rectangle(canvas, (x, y), (x + box_width, y + box_height), color, 2)
-        defect = str(detection["predicted_defect"]).replace("_", " ")
-        verdict = "FAIL " + defect if failed else "PASS"
-        text = f"ID {detection['track_id']}  {verdict}"
+        defect = str(detection["predicted_defect"])
+        text = f"#{detection['track_id']} {SHORT_LABELS.get(defect, defect)}"
         (text_width, text_height), baseline = cv2.getTextSize(
             text, cv2.FONT_HERSHEY_SIMPLEX, 0.43, 1
         )
@@ -297,16 +311,17 @@ def annotate_frame(
             1,
             cv2.LINE_AA,
         )
-    cv2.putText(
-        canvas,
-        f"FRAME {frame_index + 1:03d}  {label.upper().replace('_', ' ')}",
-        (18, height - 17),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.48,
-        (211, 221, 231),
-        1,
-        cv2.LINE_AA,
-    )
+    if captions:
+        cv2.putText(
+            canvas,
+            f"{frame_index + 1:03d}  {label.replace('_', ' ')}",
+            (12, height - 12),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.42,
+            (211, 221, 231),
+            1,
+            cv2.LINE_AA,
+        )
     return canvas
 
 
