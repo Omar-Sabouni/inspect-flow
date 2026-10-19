@@ -22,7 +22,7 @@
       <p id="runContext" class="muted">No run yet.</p>
 
       <figure class="camera">
-        <figcaption class="camera-bar"><span id="lighting">Normal light</span><span>640 × 320</span></figcaption>
+        <figcaption class="camera-bar"><span id="lighting">Normal light</span></figcaption>
         <div class="viewport">
           <span class="gate-marker" aria-hidden="true">Gate</span>
           <img id="frame" alt="Annotated conveyor frame">
@@ -43,24 +43,26 @@
         </div>
       </figure>
 
-      <section class="panel" aria-labelledby="score-heading">
-        <div class="panel-heading">
-          <h2 id="score-heading">How this run scored</h2>
-          <p id="scoreContext" class="muted">Each decision at the gate is checked against the part's true label.</p>
+      <section class="record" aria-labelledby="score-heading">
+        <div class="record-heading">
+          <h2 id="score-heading">Inspection record</h2>
+          <p id="scoreContext" class="muted"></p>
         </div>
-        <dl class="scores">
-          <div><dt>Right call</dt><dd id="rightCall">—</dd></div>
-          <div><dt>Defects passed</dt><dd id="escapes">—</dd></div>
-          <div><dt>Good parts rejected</dt><dd id="falseRejects">—</dd></div>
-          <div><dt>Parts missed</dt><dd id="missed">—</dd></div>
-          <div><dt>Detection recall</dt><dd id="recall">—</dd></div>
-          <div><dt>Detection time</dt><dd id="latency">—</dd></div>
-        </dl>
+        <div class="record-body">
+          <p class="stamp" id="stamp"><span id="rightCall">—</span><small>right call</small></p>
+          <dl class="tally">
+            <div><dt>Defects passed</dt><dd id="escapes">—</dd></div>
+            <div><dt>Good parts rejected</dt><dd id="falseRejects">—</dd></div>
+            <div><dt>Parts missed</dt><dd id="missed">—</dd></div>
+            <div><dt>Detection recall</dt><dd id="recall">—</dd></div>
+            <div><dt>Time per frame</dt><dd id="latency">—</dd></div>
+          </dl>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="parts-heading">
         <div class="panel-heading">
-          <h2 id="parts-heading">Parts in this frame</h2>
+          <h2 id="parts-heading">In this frame</h2>
           <p class="muted"><span id="passedSoFar">0</span> passed and <span id="rejectedSoFar">0</span> rejected so far</p>
         </div>
         <div class="table-wrap" tabindex="0" aria-label="Parts in this frame">
@@ -82,18 +84,17 @@
       <form id="runForm">
         <fieldset>
           <legend>Lighting</legend>
-          <label class="option"><input type="radio" name="scenario" value="nominal" checked><span><strong>Normal</strong><small>Even light</small></span></label>
-          <label class="option"><input type="radio" name="scenario" value="poor_lighting"><span><strong>Poor</strong><small>Moving spotlight, noise and blur</small></span></label>
+          <label class="option"><input type="radio" name="scenario" value="nominal" checked><span><strong>Normal</strong></span></label>
+          <label class="option"><input type="radio" name="scenario" value="poor_lighting"><span><strong>Poor</strong></span></label>
         </fieldset>
         <fieldset>
           <legend>Detector</legend>
-          <label class="option"><input type="radio" name="detector" value="classical" checked><span><strong>Classical rules</strong><small>Thresholds on size, color and the hole</small></span></label>
-          <label class="option"><input type="radio" name="detector" value="cnn"><span><strong>CNN</strong><small>Trained network, 145k parameters</small></span></label>
+          <label class="option"><input type="radio" name="detector" value="classical" checked><span><strong>Classical rules</strong></span></label>
+          <label class="option"><input type="radio" name="detector" value="cnn"><span><strong>CNN</strong></span></label>
         </fieldset>
         <label class="field">Frames <input name="frame_count" type="number" min="8" max="240" value="96" required></label>
         <details>
-          <summary>Rule thresholds</summary>
-          <p class="muted">These only affect the classical rules.</p>
+          <summary>Thresholds for the rules</summary>
           <label class="field">Size tolerance <output id="toleranceValue">18%</output>
             <input name="dimension_tolerance" type="range" min="0.05" max="0.5" step="0.01" value="0.18"></label>
           <label class="field">Color distance <output id="colorValue">60</output>
@@ -103,7 +104,7 @@
         </details>
         <p class="error" id="error" role="alert" hidden></p>
         <button class="run-button" id="runButton" type="submit">Run inspection</button>
-        <a class="download disabled" id="download" aria-disabled="true">Download decision log (CSV)</a>
+        <a class="download disabled" id="download" aria-disabled="true">Decision log (CSV)</a>
       </form>
     </aside>
   </main>

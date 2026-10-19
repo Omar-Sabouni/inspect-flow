@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["httpx2>=2.12", "pytest>=9", "pytest-cov>=6"]
-dev = ["build>=1.2", "mypy>=1.15", "pillow>=10", "pip-audit>=2.8", "ruff>=0.11"]
+dev = ["build>=1.2", "mypy>=1.15", "pillow>=13; python_version >= \"3.11\"", "pip-audit>=2.8", "ruff>=0.11"]
 train = ["onnx>=1.17", "torch>=2.4"]
 
 [project.scripts]

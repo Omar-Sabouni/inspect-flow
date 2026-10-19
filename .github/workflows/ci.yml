@@ -17,6 +17,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
+      - run: pip install --upgrade pip setuptools
       - run: pip install -e ".[test,dev]"
       - run: ruff check .
       - run: mypy

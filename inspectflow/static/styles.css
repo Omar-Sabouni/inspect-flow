@@ -1,13 +1,13 @@
-/* Steel-grey workstation with the camera in a dark housing. Safety yellow is
-   the one accent: the gate marker, the run button and selected options. */
+/* A QC inspection record: plain paper, the camera in its dark housing, and the
+   result rubber-stamped in inspector's ink. Safety yellow stays on the camera. */
 
 @font-face { font-family: Barlow; font-weight: 400; font-display: swap; src: url("/static/fonts/barlow-400.woff2") format("woff2"); }
 @font-face { font-family: Barlow; font-weight: 500; font-display: swap; src: url("/static/fonts/barlow-500.woff2") format("woff2"); }
 @font-face { font-family: Barlow; font-weight: 600; font-display: swap; src: url("/static/fonts/barlow-600.woff2") format("woff2"); }
 
 :root {
-  --steel: #e4e8eb;
-  --panel: #f6f7f8;
+  --steel: #ffffff;
+  --panel: #ffffff;
   --ink: #1a2127;
   --muted: #56626c;
   --line: #c9d0d5;
@@ -20,6 +20,8 @@
   --yellow-soft: #fff4d1;
   --pass: #1f7a4d;
   --reject: #b3261e;
+  --ink-stamp-pass: #1d6b45;
+  --ink-stamp-fail: #c0262d;
 }
 
 * { box-sizing: border-box; }
@@ -149,26 +151,34 @@ button, input { font: inherit; color: inherit; }
 
 /* Panels */
 
-.panel { padding: 16px 18px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
-.panel-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 12px; }
+.panel { padding: 16px 0 0; background: var(--panel); }
+.panel-heading h2 { font-size: 17px; }
+.panel-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
 
-/* A 1px gap over the line colour draws the dividers at any column count. */
-.scores {
+/* The record: a stamp for the headline result, a ruled tally for the rest */
+.record { padding: 4px 0 0; }
+.record-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
+.record-body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 36px; padding: 18px 8px 4px; }
+
+.stamp {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 1px;
+  justify-items: center;
   margin: 0;
-  overflow: hidden;
-  background: var(--line-soft);
-  border: 1px solid var(--line-soft);
-  border-radius: 6px;
+  padding: 10px 22px 8px;
+  color: var(--ink-stamp-pass);
+  border: 3px double currentColor;
+  border-radius: 8px;
+  transform: rotate(-6deg);
 }
-.scores > div { padding: 10px 14px 12px; background: #fff; }
-.scores dt { color: var(--muted); font-size: 14px; }
-.scores dd { margin: 2px 0 0; font-size: 26px; font-weight: 600; white-space: nowrap; }
-.scores dd small { display: block; color: var(--muted); font-size: 13px; font-weight: 400; }
-.scores .flagged { box-shadow: inset 0 -3px 0 var(--reject); }
-.scores .flagged dd { color: var(--reject); }
+.stamp span { font-size: 40px; font-weight: 600; line-height: 1; letter-spacing: -0.01em; }
+.stamp small { margin-top: 4px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; }
+.stamp.stamp--fail { color: var(--ink-stamp-fail); }
+
+.tally { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 28px; margin: 0; }
+.tally > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); }
+.tally dt { color: var(--muted); font-size: 14px; }
+.tally dd { margin: 0; font-size: 17px; font-weight: 600; white-space: nowrap; }
+.tally .flagged dd { color: var(--reject); }
 
 .table-wrap { overflow-x: auto; }
 .parts { width: 100%; font-size: 14px; border-collapse: collapse; }
@@ -184,7 +194,7 @@ button, input { font: inherit; color: inherit; }
 
 /* Run controls */
 
-.controls { position: sticky; top: 16px; }
+.controls { position: sticky; top: 16px; padding: 18px; background: #f6f7f8; border-radius: 10px; }
 .controls h2 { margin-bottom: 14px; font-size: 20px; }
 #runForm { display: grid; gap: 16px; }
 fieldset { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
@@ -204,7 +214,7 @@ legend { margin-bottom: 6px; padding: 0; font-weight: 600; }
 .option span { display: grid; }
 .option strong { font-weight: 600; }
 .option small { color: var(--muted); font-size: 13px; }
-.option:has(input:checked) { border-color: var(--ink); box-shadow: inset 4px 0 0 var(--yellow); }
+.option:has(input:checked) { border-color: var(--ink); }
 .option:has(input:focus-visible) { outline: 3px solid var(--ink); outline-offset: 2px; }
 
 .field { display: grid; grid-template-columns: 1fr auto; gap: 4px; color: var(--muted); font-size: 14px; }
@@ -223,11 +233,12 @@ summary { font-weight: 600; cursor: pointer; }
   padding: 11px 14px;
   font-weight: 600;
   cursor: pointer;
-  background: var(--yellow);
-  border: 1px solid var(--yellow-dark);
+  color: #fff;
+  background: var(--ink);
+  border: 0;
   border-radius: 6px;
 }
-.run-button:hover:not(:disabled) { background: #ffd24f; }
+.run-button:hover:not(:disabled) { background: #333c44; }
 .run-button:disabled { cursor: progress; opacity: 0.6; }
 
 .download { color: var(--ink); font-size: 14px; text-align: center; }
@@ -236,7 +247,6 @@ summary { font-weight: 600; cursor: pointer; }
 @media (max-width: 1100px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   .controls { position: static; }
-  .scores { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
@@ -245,7 +255,5 @@ summary { font-weight: 600; cursor: pointer; }
   .transport { flex-wrap: wrap; }
   .transport input { flex-basis: 100%; order: 3; }
   .flag span { display: none; }
-  .panel { padding: 14px; }
-  .scores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .scores dd { font-size: 22px; }
+  .record-body { grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 20px; }
 }

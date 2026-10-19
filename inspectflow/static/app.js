@@ -106,15 +106,14 @@ function showRun() {
 
   const gate = run.evaluation.gate;
   const detect = run.timing.detect;
-  $("scoreContext").textContent = `${gate.parts} parts reached the gate in ${run.frames.length} frames. Each decision is checked against the part's true label.`;
+  $("scoreContext").textContent = `${gate.parts} parts reached the gate in ${run.frames.length} frames.`;
   $("rightCall").textContent = percent(gate.verdict_accuracy);
   $("escapes").textContent = `${gate.counts.escape} of ${gate.defective_parts}`;
   $("falseRejects").textContent = `${gate.counts.false_reject} of ${gate.good_parts}`;
   $("missed").textContent = `${gate.counts.missed} of ${gate.parts}`;
   $("recall").textContent = percent(run.evaluation.frames.detection.recall);
-  const p95 = document.createElement("small");
-  p95.textContent = `95th percentile ${detect.p95_ms.toFixed(1)} ms`;
-  $("latency").replaceChildren(`${detect.p50_ms.toFixed(1)} ms`, p95);
+  $("latency").textContent = `${detect.p50_ms.toFixed(1)} ms`;
+  $("stamp").classList.toggle("stamp--fail", gate.verdict_accuracy < 1);
   $("escapes").parentElement.classList.toggle("flagged", gate.counts.escape > 0);
   $("falseRejects").parentElement.classList.toggle("flagged", gate.counts.false_reject > 0);
 
