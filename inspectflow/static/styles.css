@@ -1080,6 +1080,82 @@ input[type="number"] {
   font-size: 12px;
 }
 
+.field-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.score-panel {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  margin-top: 10px;
+  background: var(--surface);
+  border: 2px solid #65737b;
+  border-top-color: #ffffff;
+  border-left-color: #ffffff;
+}
+
+.score-heading {
+  padding: 10px 12px;
+  color: #fff;
+  background: var(--blue-dark);
+  border-left: 6px solid var(--signal);
+}
+
+.score-heading h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.score-heading p {
+  margin: 4px 0 0;
+  color: #d5e6ef;
+  font-size: 12px;
+}
+
+.score-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+}
+
+.score-grid > div {
+  min-width: 0;
+  padding: 8px 10px;
+  border-right: 1px solid var(--line);
+}
+
+.score-grid > div:last-child {
+  border-right: 0;
+}
+
+.score-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.score-grid dt small {
+  display: block;
+  font-weight: 400;
+}
+
+.score-grid dd {
+  margin: 4px 0 0;
+  font-family: var(--mono);
+  font-size: 18px;
+}
+
+.score-grid .flagged {
+  background: #f6e3e1;
+  box-shadow: inset 0 -4px 0 var(--reject);
+}
+
+.score-grid .flagged dd {
+  color: var(--reject);
+}
+
 .secondary-section {
   margin-top: 10px;
   background: var(--surface);
@@ -1424,6 +1500,29 @@ input[type="number"] {
   text-decoration: none;
 }
 
+/* Side by side, the camera sets the row height. Size containment stops a long
+   measurement log from stretching the camera panel; the log scrolls instead. */
+@media (min-width: 1281px) {
+  .frame-readout {
+    display: flex;
+    flex-direction: column;
+    contain: size;
+  }
+
+  .frame-readout .detection-log {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .frame-readout .table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 1280px) {
   .frame-evidence-grid {
     grid-template-columns: 1fr;
@@ -1443,6 +1542,42 @@ input[type="number"] {
     grid-template-columns: minmax(0, 1fr) 310px;
   }
 
+}
+
+@media (max-width: 1180px) {
+  .score-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .score-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .score-grid > div:nth-child(3n) {
+    border-right: 0;
+  }
+
+  .score-grid > div:nth-child(-n + 3) {
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 430px) {
+  .score-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .score-grid > div:nth-child(3n) {
+    border-right: 1px solid var(--line);
+  }
+
+  .score-grid > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .score-grid > div:nth-child(-n + 4) {
+    border-bottom: 1px solid var(--line);
+  }
 }
 
 @media (max-width: 900px) {

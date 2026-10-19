@@ -8,6 +8,7 @@ import {
   CONFIG_FIELDS,
   STATIC_META,
   defectCounts,
+  formatPercent,
   isRecord,
   normaliseRun,
   payloadFingerprint,
@@ -25,10 +26,12 @@ const elementIds = [
   "runForm", "frameCountInput", "dimensionToleranceInput", "dimensionToleranceOutput",
   "colorThresholdInput", "colorThresholdOutput", "featureMinInput", "featureMaxInput",
   "runButton", "compareButton", "compareProgress", "settingsState", "formMessage",
-  "failureNote", "compareNominalButton", "runStatusLive",
+  "failureNote", "failureNoteText", "compareNominalButton", "runStatusLive",
   "defectChart", "defectTotal", "defectDimensionValue", "defectColorValue", "defectFeatureValue",
   "comparisonPanel", "comparisonStatus", "comparisonEmpty", "comparisonTableWrap", "comparisonTableBody",
   "csvExportButton",
+  "scoreContext", "scoreVerdictAccuracy", "scoreEscapes", "scoreFalseRejects",
+  "scoreMissed", "scoreRecall", "scoreLatency",
 ];
 
 const el = {};
@@ -167,6 +170,9 @@ function applyMeta(meta) {
   const scenario = defaults.scenario === "poor_lighting" ? "poor_lighting" : "nominal";
   const scenarioInput = el.runForm.querySelector(`input[name="scenario"][value="${scenario}"]`);
   if (scenarioInput) scenarioInput.checked = true;
+  const detector = defaults.detector === "cnn" ? "cnn" : "classical";
+  const detectorInput = el.runForm.querySelector(`input[name="detector"][value="${detector}"]`);
+  if (detectorInput) detectorInput.checked = true;
   updateRangeDisplays();
   updateScenarioOptions();
   updateSettingsState();
@@ -187,7 +193,7 @@ function applyNumberSpec(input, spec, defaultValue) {
 
 function updateScenarioOptions() {
   document.querySelectorAll(".scenario-option").forEach((option) => {
-    const radio = option.querySelector('input[name="scenario"]');
+    const radio = option.querySelector('input[type="radio"]');
     option.classList.toggle("selected", Boolean(radio && radio.checked));
   });
 }
@@ -225,10 +231,12 @@ function inputNumber(name) {
 
 function readPayload() {
   const selected = el.runForm.querySelector('input[name="scenario"]:checked');
+  const detector = el.runForm.querySelector('input[name="detector"]:checked');
   const config = {};
   for (const name of CONFIG_FIELDS) config[name] = inputNumber(name);
   return {
     scenario: selected && selected.value === "poor_lighting" ? "poor_lighting" : "nominal",
+    detector: detector && detector.value === "cnn" ? "cnn" : "classical",
     frame_count: inputNumber("frame_count"),
     config,
   };
@@ -425,7 +433,44 @@ function populateRunMetadata(run) {
   el.viewport.style.aspectRatio = `${run.image_width} / ${run.image_height}`;
   el.scenarioFlag.hidden = run.scenario !== "poor_lighting";
   el.failureNote.hidden = run.scenario !== "poor_lighting";
+  el.failureNoteText.textContent = run.detector === "cnn"
+    ? "The CNN never saw this spotlight lighting during training. Run the same scene with the classical rules to see where fixed thresholds fail."
+    : "The color threshold is absolute, so dimming pushes most parts past it and the rules reject them as wrong color. Parts in the darkest regions are not segmented at all. Run the same scene with the CNN detector to compare.";
   configureExport(el.csvExportButton, run.exports.csv_url, "inspectflow-decisions.csv");
+  renderScores(run);
+}
+
+function renderScores(run) {
+  const evaluation = isRecord(run.evaluation) ? run.evaluation : {};
+  const gate = isRecord(evaluation.gate) ? evaluation.gate : {};
+  const counts = isRecord(gate.counts) ? gate.counts : {};
+  const frames = isRecord(evaluation.frames) ? evaluation.frames : {};
+  const detection = isRecord(frames.detection) ? frames.detection : {};
+  const stages = isRecord(run.timing) && isRecord(run.timing.stages) ? run.timing.stages : {};
+  const detect = isRecord(stages.detect) ? stages.detect : {};
+
+  el.scoreVerdictAccuracy.textContent = formatPercent(gate.verdict_accuracy);
+  el.scoreEscapes.textContent = countOf(counts.escape, gate.defective_parts);
+  el.scoreFalseRejects.textContent = countOf(counts.false_reject, gate.good_parts);
+  el.scoreMissed.textContent = countOf(counts.missed, gate.parts);
+  el.scoreRecall.textContent = formatPercent(detection.recall);
+  const p50 = strictNumber(detect.p50_ms, { min: 0 });
+  const p95 = strictNumber(detect.p95_ms, { min: 0 });
+  el.scoreLatency.textContent = p50 === null || p95 === null ? "—" : `${p50.toFixed(1)} / ${p95.toFixed(1)} ms`;
+  el.scoreEscapes.parentElement.classList.toggle("flagged", (strictNumber(counts.escape, { min: 0 }) ?? 0) > 0);
+  el.scoreFalseRejects.parentElement.classList.toggle("flagged", (strictNumber(counts.false_reject, { min: 0 }) ?? 0) > 0);
+
+  const parts = strictNumber(gate.parts, { min: 0, integer: true });
+  el.scoreContext.textContent = parts === null
+    ? "This run has no ground-truth evaluation."
+    : `${scenarioLabel(run.scenario)} · ${detectorLabel(run.detector)} · ${parts} part${parts === 1 ? "" : "s"} reached the gate in ${run.frames.length} frames.`;
+}
+
+function countOf(value, total) {
+  const count = strictNumber(value, { min: 0, integer: true });
+  const of = strictNumber(total, { min: 0, integer: true });
+  if (count === null) return "—";
+  return of === null ? String(count) : `${count} of ${of}`;
 }
 
 function configureExport(anchor, rawUrl, filename) {
@@ -660,7 +705,7 @@ function updateResultContext(force = false) {
     el.resultContext.textContent = "No completed run selected.";
     return;
   }
-  el.resultContext.textContent = `${scenarioLabel(state.activeRun.scenario)} · completed result`;
+  el.resultContext.textContent = `${scenarioLabel(state.activeRun.scenario)} · ${detectorLabel(state.activeRun.detector)} · completed result`;
 }
 
 function setSystemStatus(kind, text) {
@@ -687,6 +732,10 @@ function showFormError(message, focus = true) {
 
 function scenarioLabel(scenario) {
   return scenario === "poor_lighting" ? "Poor lighting" : "Nominal";
+}
+
+function detectorLabel(detector) {
+  return detector === "cnn" ? "CNN" : "Classical rules";
 }
 
 function padFrame(value, total) {

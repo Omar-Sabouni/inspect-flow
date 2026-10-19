@@ -241,3 +241,23 @@ test("reduced-motion preference suppresses automatic replay", async ({ page }) =
     "Play",
   );
 });
+
+test("a CNN run on poor light reports ground-truth scores", async ({ page }) => {
+  await page.goto("/");
+  await waitForRun(page);
+  await expect(page.locator("#scoreVerdictAccuracy")).toHaveText(/^\d+\.\d%$/);
+  await expect(page.locator("#scoreContext")).toContainText("Classical rules");
+
+  await page.locator('input[name="scenario"][value="poor_lighting"]').check();
+  await page.locator('input[name="detector"][value="cnn"]').check();
+  await page.locator("#frameCountInput").fill("48");
+  await page.locator("#runButton").click();
+
+  await expect(page.locator("#resultContext")).toContainText("Poor lighting · CNN", {
+    timeout: 90_000,
+  });
+  await expect(page.locator("#scoreContext")).toContainText("CNN");
+  await expect(page.locator("#scoreEscapes")).toHaveText(/^\d+ of \d+$/);
+  await expect(page.locator("#scoreLatency")).toHaveText(/ ms$/);
+  await expectNoAxeViolations(page);
+});

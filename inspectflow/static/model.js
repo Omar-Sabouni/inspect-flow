@@ -20,6 +20,7 @@ export const CONFIG_FIELDS = Object.freeze([
 export const STATIC_META = Object.freeze({
   defaults: {
     scenario: "nominal",
+    detector: "classical",
     frame_count: 96,
     config: {
       expected_width_px: 80,
@@ -55,13 +56,20 @@ export const STATIC_META = Object.freeze({
   },
 });
 
+// Paths start at the run object. "better" sets the color of the delta column.
 export const METRIC_DEFINITIONS = Object.freeze([
-  { label: "Accepted at gate", path: ["accepted"], format: "count", better: "higher" },
-  { label: "Rejected at gate", path: ["rejected"], format: "count", better: "lower" },
-  { label: "Undecided tracks", path: ["undecided_tracks"], format: "count", better: "lower" },
-  { label: "Dimension rejects", path: ["defect_counts", "incorrect_dimensions"], format: "count", better: "lower" },
-  { label: "Color rejects", path: ["defect_counts", "wrong_color"], format: "count", better: "lower" },
-  { label: "Feature rejects", path: ["defect_counts", "missing_feature"], format: "count", better: "lower" },
+  { label: "Gate verdict accuracy", path: ["evaluation", "gate", "verdict_accuracy"], format: "percent", better: "higher" },
+  { label: "Escapes (defect passed)", path: ["evaluation", "gate", "counts", "escape"], format: "count", better: "lower" },
+  { label: "False rejects", path: ["evaluation", "gate", "counts", "false_reject"], format: "count", better: "lower" },
+  { label: "Missed at gate", path: ["evaluation", "gate", "counts", "missed"], format: "count", better: "lower" },
+  { label: "Detection recall", path: ["evaluation", "frames", "detection", "recall"], format: "percent", better: "higher" },
+  { label: "Accepted at gate", path: ["summary", "accepted"], format: "count", better: "neutral" },
+  { label: "Rejected at gate", path: ["summary", "rejected"], format: "count", better: "neutral" },
+  { label: "Undecided tracks", path: ["summary", "undecided_tracks"], format: "count", better: "lower" },
+  { label: "Dimension rejects", path: ["summary", "defect_counts", "incorrect_dimensions"], format: "count", better: "neutral" },
+  { label: "Color rejects", path: ["summary", "defect_counts", "wrong_color"], format: "count", better: "neutral" },
+  { label: "Feature rejects", path: ["summary", "defect_counts", "missing_feature"], format: "count", better: "neutral" },
+  { label: "Detect time p50", path: ["timing", "stages", "detect", "p50_ms"], format: "ms", better: "lower" },
 ]);
 
 export function isRecord(value) {
@@ -119,6 +127,7 @@ export function normaliseRun(data) {
     ...data,
     run_id: runId,
     scenario: data.scenario,
+    detector: data.detector === "cnn" ? "cnn" : "classical",
     frame_count: declaredCount,
     fps: requiredNumber(data.fps, "playback rate", { min: 0.1 }),
     image_width: requiredNumber(data.image_width, "image width", { min: 1, integer: true }),
@@ -126,6 +135,8 @@ export function normaliseRun(data) {
     config: isRecord(data.config) ? data.config : {},
     frames,
     summary: isRecord(data.summary) ? data.summary : {},
+    evaluation: isRecord(data.evaluation) ? data.evaluation : {},
+    timing: isRecord(data.timing) ? data.timing : {},
     exports: isRecord(data.exports) ? data.exports : {},
   };
 }
@@ -154,7 +165,7 @@ export function defectCounts(value) {
 }
 
 export function metricValue(run, definition) {
-  let value = run && run.summary;
+  let value = run;
   for (const key of definition.path) {
     if (!isRecord(value) || !(key in value)) return null;
     value = value[key];
@@ -162,23 +173,34 @@ export function metricValue(run, definition) {
   return strictNumber(value, { min: 0 });
 }
 
+export function formatPercent(value) {
+  const number = strictNumber(value, { min: 0, max: 1 });
+  return number === null ? "—" : `${(number * 100).toFixed(1)}%`;
+}
+
 export function formatMetric(value, format) {
   if (value === null) return "—";
+  if (format === "percent") return formatPercent(value);
+  if (format === "ms") return `${value.toFixed(2)} ms`;
   return formatWhole(value);
 }
 
 export function formatDelta(nominal, poor, definition) {
   if (nominal === null || poor === null) return { text: "—", quality: "unavailable", description: "Unavailable" };
-  const delta = poor - nominal;
-  const epsilon = 0.5;
+  const scale = definition.format === "percent" ? 100 : 1;
+  const delta = (poor - nominal) * scale;
+  const epsilon = definition.format === "count" ? 0.5 : 0.05;
   const sign = delta > epsilon ? "+" : delta < -epsilon ? "−" : "";
   const magnitude = Math.abs(delta);
-  let value;
-  value = String(Math.round(magnitude));
+  const unit = definition.format === "percent" ? " pp" : definition.format === "ms" ? " ms" : "";
+  const value = definition.format === "count" ? String(Math.round(magnitude)) : magnitude.toFixed(1);
   if (Math.abs(delta) <= epsilon) return { text: "0", quality: "neutral", description: "No material change" };
+  if (definition.better === "neutral") {
+    return { text: `${sign}${value}${unit}`, quality: "neutral", description: "Change" };
+  }
   const favorable = definition.better === "higher" ? delta > 0 : delta < 0;
   return {
-    text: `${sign}${value} ${delta > 0 ? "↑" : "↓"}`,
+    text: `${sign}${value}${unit} ${delta > 0 ? "↑" : "↓"}`,
     quality: favorable ? "favorable" : "unfavorable",
     description: favorable ? "Favorable change" : "Unfavorable change",
   };
@@ -187,5 +209,10 @@ export function formatDelta(nominal, poor, definition) {
 export function payloadFingerprint(payload) {
   const config = {};
   for (const key of [...CONFIG_FIELDS].sort()) config[key] = payload.config[key];
-  return JSON.stringify({ scenario: payload.scenario, frame_count: payload.frame_count, config });
+  return JSON.stringify({
+    scenario: payload.scenario,
+    detector: payload.detector,
+    frame_count: payload.frame_count,
+    config,
+  });
 }

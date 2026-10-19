@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#111820">
   <title>InspectFlow — inspection replay station</title>
+  <meta name="description" content="Conveyor inspection with classical OpenCV rules and a small CNN, scored against ground truth.">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -120,6 +121,21 @@
               </div>
             </fieldset>
 
+            <fieldset class="scenario-fieldset detector-fieldset">
+              <legend>Detector</legend>
+              <div class="scenario-options">
+                <label class="scenario-option selected">
+                  <input type="radio" name="detector" value="classical" checked>
+                  <span><strong>Classical rules</strong><small>HSV mask / measured thresholds</small></span>
+                </label>
+                <label class="scenario-option">
+                  <input type="radio" name="detector" value="cnn">
+                  <span><strong>CNN</strong><small>145k-parameter ONNX model</small></span>
+                </label>
+              </div>
+              <p class="field-hint" id="detectorHint">Inspection parameters apply to the classical rules only.</p>
+            </fieldset>
+
             <div class="form-section">
               <label class="field"><span>Frames</span><input id="frameCountInput" name="frame_count" type="number" min="8" max="240" step="1" value="96" required></label>
             </div>
@@ -176,8 +192,23 @@
       </div>
     </section>
 
+    <section class="score-panel" aria-labelledby="score-heading">
+      <div class="score-heading">
+        <h2 id="score-heading">Scored against ground truth</h2>
+        <p id="scoreContext">Every synthetic part has a known label. Results cover the whole run.</p>
+      </div>
+      <dl class="score-grid" id="scoreGrid">
+        <div><dt>Gate verdict accuracy</dt><dd id="scoreVerdictAccuracy">—</dd></div>
+        <div class="score-risk"><dt>Escapes <small>defect passed</small></dt><dd id="scoreEscapes">—</dd></div>
+        <div class="score-risk"><dt>False rejects <small>good part rejected</small></dt><dd id="scoreFalseRejects">—</dd></div>
+        <div><dt>Missed at gate</dt><dd id="scoreMissed">—</dd></div>
+        <div><dt>Detection recall <small>per frame</small></dt><dd id="scoreRecall">—</dd></div>
+        <div><dt>Detect time <small>p50 / p95</small></dt><dd id="scoreLatency">—</dd></div>
+      </dl>
+    </section>
+
     <section class="failure-note" id="failureNote" hidden>
-      <div><h2>Poor-light result</h2><p>Dim illumination and sensor noise can merge edges, hide the circular feature, or fragment a contour.</p></div>
+      <div><h2>Poor-light result</h2><p id="failureNoteText">The color threshold is absolute, so dimming pushes most parts past it and the rules reject them as wrong color. Parts in the darkest regions are not segmented at all. Run the same scene with the CNN detector to compare.</p></div>
       <button id="compareNominalButton" type="button">Compare with nominal</button>
     </section>
 
