@@ -113,3 +113,32 @@ jobs:
           name: playwright-report
           path: playwright-report/
           if-no-files-found: ignore
+
+  container:
+    name: Container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --tag inspect-flow:ci .
+      - name: Start container
+        run: >-
+          docker run --detach --name inspect-flow
+          --publish 127.0.0.1:8000:8000 inspect-flow:ci
+      - name: Wait for readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8000/api/ready; then exit 0; fi
+            sleep 1
+          done
+          docker logs inspect-flow
+          exit 1
+      - name: Run a CNN inspection in the container
+        run: |
+          curl --silent --show-error --fail -X POST http://127.0.0.1:8000/api/runs \
+            -H 'content-type: application/json' \
+            -d '{"scenario":"poor_lighting","detector":"cnn","frame_count":24}' \
+            | python3 -c "import json, sys; print(json.load(sys.stdin)['evaluation']['gate'])"
+      - name: Show container logs
+        if: failure()
+        run: docker logs inspect-flow
