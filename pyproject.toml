@@ -20,7 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-  "httpx2>=2.10,<3",
+  "httpx2>=2.12,<3",
   "pytest>=9.0.3,<10",
   "pytest-cov>=6,<8",
 ]
