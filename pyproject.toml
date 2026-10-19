@@ -1,95 +1,54 @@
 [build-system]
-requires = ["setuptools>=68,<85"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "inspect-flow"
 version = "0.3.0"
-description = "Conveyor inspection with classical OpenCV rules and a small ONNX CNN, scored against ground truth"
+description = "Conveyor defect inspection with OpenCV rules and a small CNN, checked against ground truth"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "anyio>=4.8,<5",
-  "fastapi>=0.141.1,<0.142",
-  "numpy>=1.26,<3",
-  "opencv-python-headless>=4.9,<5",
-  "pydantic>=2.9,<3",
-  "starlette>=1.3.1,<2",
-  "uvicorn[standard]>=0.52.1,<0.53",
+  "fastapi>=0.141.1",
+  "numpy>=1.26",
+  "opencv-python-headless>=4.9",
+  "pydantic>=2.9",
+  "starlette>=1.3.1",
+  "uvicorn[standard]>=0.52",
 ]
 
 [project.optional-dependencies]
-test = [
-  "httpx2>=2.12,<3",
-  "pytest>=9.0.3,<10",
-  "pytest-cov>=6,<8",
-]
-train = [
-  "onnx>=1.17,<2",
-  "torch>=2.4,<3",
-]
-dev = [
-  "build>=1.2,<2",
-  "mypy>=1.15,<2",
-  "pillow>=10,<13",
-  "pip-audit>=2.8,<3",
-  "ruff>=0.11,<1",
-  "setuptools>=68,<85",
-  "twine>=6,<7",
-]
+test = ["httpx2>=2.12", "pytest>=9", "pytest-cov>=6"]
+dev = ["build>=1.2", "mypy>=1.15", "pillow>=10", "pip-audit>=2.8", "ruff>=0.11"]
+train = ["onnx>=1.17", "torch>=2.4"]
 
 [project.scripts]
 inspect-flow = "inspectflow.cli:main"
 
-[tool.setuptools]
-include-package-data = true
-
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["inspectflow", "inspectflow.*"]
+include = ["inspectflow*"]
 
 [tool.setuptools.package-data]
-inspectflow = [
-  "models/*.onnx",
-  "models/*.json",
-  "static/*",
-  "static/**/*",
-]
+inspectflow = ["models/*", "static/*", "static/fonts/*"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
-pythonpath = ["."]
 
 [tool.coverage.run]
 branch = true
 source = ["inspectflow"]
 
 [tool.coverage.report]
-exclude_also = [
-  "if TYPE_CHECKING:",
-  "if __name__ == .__main__.:",
-  "raise NotImplementedError",
-]
+fail_under = 90
 show_missing = true
-skip_covered = true
 
 [tool.ruff]
-target-version = "py310"
-line-length = 88
-extend-exclude = ["docs"]
-
-[tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
+line-length = 120
 
 [tool.mypy]
-python_version = "3.10"
-files = ["inspectflow", "scripts"]
-check_untyped_defs = true
-follow_imports = "skip"
+files = ["inspectflow"]
 ignore_missing_imports = true
-no_implicit_optional = true
-no_site_packages = true
-show_error_codes = true
-warn_redundant_casts = true
-warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]

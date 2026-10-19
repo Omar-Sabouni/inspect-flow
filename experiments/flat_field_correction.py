@@ -26,7 +26,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from inspectflow.evaluation import evaluate_run  # noqa: E402
 from inspectflow.generator import SyntheticConveyor  # noqa: E402
 from inspectflow.inspection import PartInspector  # noqa: E402
-from inspectflow.tracking import CentroidTracker  # noqa: E402
 
 NOMINAL_BELT_BRIGHTNESS = 60.0
 SEEDS = (100, 101, 102)
@@ -52,10 +51,9 @@ def score(scenario: str, mode: str) -> tuple[float, float, float]:
     recalls, accuracies, milliseconds = [], [], []
     for seed in SEEDS:
         inspector = PartInspector()
-        tracker = CentroidTracker(max_distance=70.0, max_missed=4)
         truth, detections = [], []
         elapsed = 0.0
-        for frame in SyntheticConveyor(seed=seed, frame_count=240, scenario=scenario).iter_frames():
+        for frame in SyntheticConveyor(seed, 240, scenario).iter_frames():
             started = time.perf_counter()
             if mode == "none":
                 image = frame.image
@@ -65,12 +63,11 @@ def score(scenario: str, mode: str) -> tuple[float, float, float]:
                 )
             found = inspector.inspect(image)
             elapsed += time.perf_counter() - started
-            detections.append(tracker.update(found, frame.index))
-            truth.append(frame.truth_metadata())
+            detections.append(found)
+            truth.append(frame.ground_truth)
         report = evaluate_run(truth, detections)
-        matrix = np.asarray(report["defect_classification"]["confusion_matrix"])
         recalls.append(report["detection"]["recall"])
-        accuracies.append(float(np.trace(matrix) / max(1, matrix.sum())))
+        accuracies.append(report["defect_accuracy"])
         milliseconds.append(1000.0 * elapsed / len(truth))
     return float(np.mean(recalls)), float(np.mean(accuracies)), float(np.mean(milliseconds))
 
@@ -85,7 +82,7 @@ MODES = {
 def belt_noise(scenario: str) -> tuple[float, float]:
     """Noise std on an empty belt patch, before and after correction."""
 
-    frames = SyntheticConveyor(seed=SEEDS[0], frame_count=40, scenario=scenario)
+    frames = SyntheticConveyor(SEEDS[0], 40, scenario)
     before, after = [], []
     for frame in frames.iter_frames():
         # Rows 56-66 are empty belt above every part. The light field and the

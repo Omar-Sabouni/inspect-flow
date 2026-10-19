@@ -1,7 +1,8 @@
-"""InspectFlow's computer-vision inspection pipeline."""
+"""Conveyor defect inspection with classical rules and a small CNN."""
 
-from .config import INSPECTION_CONFIG_FIELDS, InspectionConfig
+from .config import InspectionConfig
 from .detectors import CnnPartDetector
+from .generator import SyntheticConveyor
 from .inspection import PartInspector
 from .pipeline import InspectionPipeline
 from .tracking import CentroidTracker
@@ -9,8 +10,8 @@ from .tracking import CentroidTracker
 __all__ = [
     "CentroidTracker",
     "CnnPartDetector",
-    "INSPECTION_CONFIG_FIELDS",
     "InspectionConfig",
     "InspectionPipeline",
     "PartInspector",
+    "SyntheticConveyor",
 ]

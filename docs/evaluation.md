@@ -7,12 +7,10 @@ poor-light run with the same seed contain the same parts.
 
 ## Per frame
 
-`evaluate_run` in `inspectflow/evaluation.py` matches detections to labelled
-parts in each frame at IoU 0.3 or more. It uses a min-cost flow, so it first
-maximises the number of matches and then their total IoU, and the result
-doesn't depend on detection order. From the matches it reports detection
-precision and recall, a four-class confusion matrix for the matched parts,
-and how often a part's track ID changes between frames.
+`evaluate_run` in `inspectflow/evaluation.py` pairs detections with labelled
+parts in each frame, highest IoU first, down to an IoU of 0.3. From the pairs
+it reports detection precision and recall and a four-class confusion matrix
+for the matched parts.
 
 ## At the gate
 

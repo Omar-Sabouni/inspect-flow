@@ -73,9 +73,9 @@ all 440 parts. The full table is in [results/benchmark.md](results/benchmark.md)
 ```bash
 pip install -e '.[train]'
 python training/train_detector.py --device cuda
-python training/train_detector.py --evaluate-only   # re-score after changing decode settings
 ```
 
 The export uses PyTorch's TorchScript exporter at opset 17, which OpenCV's DNN
-module reads. `tests/test_detectors.py` checks that the model file still
-matches the hash in its training record.
+module reads. `tests/test_cnn.py` checks that the model file still matches the
+hash in its training record, and that the CNN still decides every part
+correctly in a poor-light test scene.

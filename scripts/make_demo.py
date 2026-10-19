@@ -29,13 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from inspectflow.detectors import DetectorName  # noqa: E402
 from inspectflow.evaluation import evaluate_gate  # noqa: E402
-from inspectflow.generator import FrameGroundTruth, SyntheticConveyor  # noqa: E402
-from inspectflow.pipeline import (  # noqa: E402
-    INSPECTION_GATE_FRACTION,
-    InspectionPipeline,
-    annotate_frame,
-    make_detector,
-)
+from inspectflow.generator import SyntheticConveyor  # noqa: E402
+from inspectflow.pipeline import GATE_FRACTION, InspectionPipeline, annotate_frame, make_detector  # noqa: E402
 
 HEADER_PX = 38
 BADGE_FRAMES = 9
@@ -67,14 +62,14 @@ def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.Im
 
 
 def run_panel(detector: DetectorName, title: str, seed: int, frame_count: int) -> Panel:
-    conveyor = SyntheticConveyor(seed=seed, frame_count=frame_count, scenario="poor_lighting")
-    gate_x = round(conveyor.width * INSPECTION_GATE_FRACTION)
-    pipeline = InspectionPipeline(make_detector(detector), gate_x=gate_x)
+    conveyor = SyntheticConveyor(seed, frame_count, "poor_lighting")
+    gate_x = round(conveyor.width * GATE_FRACTION)
+    pipeline = InspectionPipeline(make_detector(detector), gate_x)
     panel = Panel(title)
-    truth: list[FrameGroundTruth] = []
+    truth: list[list[dict]] = []
     for frame in conveyor.iter_frames():
         tracked, _ = pipeline.process(frame.image, frame.index)
-        truth.append(frame.truth_metadata())
+        truth.append(frame.ground_truth)
         panel.frames.append(
             annotate_frame(
                 frame.image, tracked, frame_index=frame.index, label="poor lighting", gate_x=gate_x
@@ -85,7 +80,7 @@ def run_panel(detector: DetectorName, title: str, seed: int, frame_count: int) -
     correct_at: list[int] = []
     wrong_at: list[int] = []
     matched: set[str] = set()
-    for decision, outcome in zip(pipeline.decisions, report["outcomes"]):
+    for decision, outcome in zip(pipeline.decisions, report["outcomes"], strict=True):
         frame_index = int(decision["decision_frame"])
         matched.add(outcome["truth_part_id"])
         if outcome["outcome"] in ("correct_pass", "correct_reject"):
@@ -98,13 +93,13 @@ def run_panel(detector: DetectorName, title: str, seed: int, frame_count: int) -
     # A part is missed on the frame its true centroid crosses the gate.
     missed_at: list[int] = []
     last_x: dict[str, float] = {}
-    for record in truth:
-        for item in record.ground_truth:
+    for index, parts in enumerate(truth):
+        for item in parts:
             part, x = item["part_id"], float(item["centroid"][0])
             previous = last_x.get(part)
             if previous is not None and previous < gate_x <= x and part not in matched:
-                missed_at.append(record.index)
-                panel.events.setdefault(record.index, ("missed", MISSED))
+                missed_at.append(index)
+                panel.events.setdefault(index, ("missed", MISSED))
             last_x[part] = x
 
     for index in range(frame_count):
@@ -158,7 +153,10 @@ def encode(frame_dir: Path, output: Path, fps: int) -> None:
     pattern = str(frame_dir / "%04d.png")
     suffix = output.suffix.lower()
     if suffix == ".gif":
-        filters = f"fps={fps},split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle"
+        filters = (
+            f"fps={fps},split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];"
+            "[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle"
+        )
         command = ["-framerate", str(fps), "-i", pattern, "-filter_complex", filters, "-loop", "0"]
     elif suffix == ".webp":
         command = ["-framerate", str(fps), "-i", pattern, "-c:v", "libwebp_anim", "-quality", "70", "-loop", "0"]
@@ -189,7 +187,7 @@ def main() -> None:
         run_panel("classical", "Classical rules", args.seed, args.frames),
         run_panel("cnn", "CNN", args.seed, args.frames),
     ]
-    gate_x = round(panels[0].frames[0].shape[1] * INSPECTION_GATE_FRACTION)
+    gate_x = round(panels[0].frames[0].shape[1] * GATE_FRACTION)
     with tempfile.TemporaryDirectory() as temp:
         for index in range(args.frames):
             compose(panels, index, gate_x).save(Path(temp) / f"{index:04d}.png")

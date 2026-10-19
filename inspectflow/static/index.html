@@ -3,213 +3,111 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#E4E8EB">
   <title>InspectFlow</title>
-  <meta name="description" content="Defect inspection on a simulated conveyor with OpenCV rules and a small CNN, checked against ground truth.">
   <link rel="preload" href="/static/fonts/barlow-500.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to the replay</a>
-
   <header class="app-bar">
     <div class="brand">
       <h1>InspectFlow</h1>
       <p>Defect inspection on a simulated conveyor</p>
     </div>
-    <span class="system-state" id="systemState" role="status" aria-live="polite">
-      <i aria-hidden="true"></i><span>Ready to run</span>
-    </span>
+    <span class="status" id="status" role="status"><i aria-hidden="true"></i><span>Starting</span></span>
   </header>
 
-  <main class="app-shell" id="main-content" tabindex="-1">
-    <div class="layout">
-      <section class="viewer-panel" aria-labelledby="replay-heading">
-        <div class="replay-heading">
-          <div>
-            <h2 id="replay-heading">Replay</h2>
-            <p id="resultContext" role="status">No run yet.</p>
-          </div>
-          <div class="result-switcher" id="resultSwitcher" hidden aria-label="Which comparison run to show">
-            <button id="resultNominalButton" type="button" aria-pressed="false">Normal light</button>
-            <button id="resultPoorButton" type="button" aria-pressed="false">Poor light</button>
+  <main class="layout">
+    <section class="replay" aria-labelledby="replay-heading">
+      <h2 id="replay-heading">Replay</h2>
+      <p id="runContext" class="muted">No run yet.</p>
+
+      <figure class="camera">
+        <figcaption class="camera-bar"><span id="lighting">Normal light</span><span>640 × 320</span></figcaption>
+        <div class="viewport">
+          <span class="gate-marker" aria-hidden="true">Gate</span>
+          <img id="frame" alt="Annotated conveyor frame">
+          <div class="flag" id="poorLightFlag" hidden><strong>Poor light</strong><span>Dim light and sensor noise</span></div>
+        </div>
+        <div class="transport">
+          <button class="play-button" id="playButton" type="button" aria-label="Play" disabled>
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>
+            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
+          </button>
+          <span class="frame-number">Frame <strong id="frameNumber">0</strong> of <span id="frameTotal">0</span></span>
+          <input id="scrubber" type="range" min="0" max="0" value="0" aria-label="Frame" disabled>
+          <div class="speed" role="group" aria-label="Playback speed">
+            <button type="button" data-speed="0.5" aria-pressed="false">0.5×</button>
+            <button type="button" data-speed="1" aria-pressed="true">1×</button>
+            <button type="button" data-speed="2" aria-pressed="false">2×</button>
           </div>
         </div>
+      </figure>
 
-        <figure class="camera">
-          <figcaption class="camera-bar">
-            <span id="modeReadout">Normal light</span>
-            <span id="resolutionReadout">640 × 320</span>
-          </figcaption>
-          <div class="viewport" id="viewport">
-            <span class="gate-marker" aria-hidden="true">Gate</span>
-            <img id="frameImage" alt="Annotated conveyor frame" draggable="false">
-            <div class="viewport-placeholder" id="framePlaceholder">
-              <strong>No frame loaded</strong>
-              <small>Starting the first run.</small>
-            </div>
-            <div class="scenario-flag" id="scenarioFlag" hidden>
-              <strong>Poor light</strong>
-              <span>Dim light and sensor noise</span>
-            </div>
-          </div>
-          <div class="transport" aria-label="Replay controls">
-            <button class="play-button" id="playPauseButton" type="button" aria-label="Play" disabled>
-              <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>
-              <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
-            </button>
-            <span class="frame-number">Frame <strong id="currentFrame">000</strong> of <span id="totalFrames">000</span></span>
-            <label class="scrubber-wrap" for="frameScrubber">
-              <span class="sr-only">Frame</span>
-              <input id="frameScrubber" class="scrubber" type="range" min="0" max="0" value="0" disabled>
-            </label>
-            <div class="speed-control" role="group" aria-label="Playback speed">
-              <button type="button" data-speed="0.5" aria-pressed="false">0.5×</button>
-              <button type="button" data-speed="1" class="active" aria-pressed="true">1×</button>
-              <button type="button" data-speed="2" aria-pressed="false">2×</button>
-            </div>
-          </div>
-        </figure>
-
-        <section class="score-panel" aria-labelledby="score-heading">
-          <div class="score-heading">
-            <h2 id="score-heading">How this run scored</h2>
-            <p id="scoreContext">Each decision at the gate is checked against the part's true label.</p>
-          </div>
-          <dl class="score-grid" id="scoreGrid">
-            <div><dt>Right call</dt><dd id="scoreVerdictAccuracy">—</dd></div>
-            <div><dt>Defects passed</dt><dd id="scoreEscapes">—</dd></div>
-            <div><dt>Good parts rejected</dt><dd id="scoreFalseRejects">—</dd></div>
-            <div><dt>Parts missed</dt><dd id="scoreMissed">—</dd></div>
-            <div><dt>Detection recall</dt><dd id="scoreRecall">—</dd></div>
-            <div><dt>Detection time</dt><dd id="scoreLatency">—</dd></div>
-          </dl>
-        </section>
-
-        <section class="frame-readout" aria-labelledby="detection-log-heading">
-          <div class="log-heading">
-            <h2 id="detection-log-heading">Parts in this frame</h2>
-            <span id="detectionLogStatus">No detections</span>
-          </div>
-          <dl class="current-frame-data" aria-label="Gate decisions up to this frame">
-            <div class="accepted"><dt>Passed so far</dt><dd><strong id="acceptedCount">0</strong> <span id="acceptedRate">0%</span></dd></div>
-            <div class="rejected"><dt>Rejected so far</dt><dd><strong id="rejectedCount">0</strong> <span id="rejectedRate">0%</span></dd></div>
-          </dl>
-          <div class="table-wrap" tabindex="0" aria-label="Measurements for parts in this frame">
-            <table class="data-table detection-table">
-              <thead>
-                <tr><th scope="col">Track</th><th scope="col">Decision</th><th scope="col">Defect</th><th scope="col">W × H</th><th scope="col">Area</th><th scope="col">Color Δ</th><th scope="col">Hole r</th></tr>
-              </thead>
-              <tbody id="detectionLogBody"><tr class="empty-row"><td colspan="7">Waiting for a frame.</td></tr></tbody>
-            </table>
-          </div>
-        </section>
+      <section class="panel" aria-labelledby="score-heading">
+        <div class="panel-heading">
+          <h2 id="score-heading">How this run scored</h2>
+          <p id="scoreContext" class="muted">Each decision at the gate is checked against the part's true label.</p>
+        </div>
+        <dl class="scores">
+          <div><dt>Right call</dt><dd id="rightCall">—</dd></div>
+          <div><dt>Defects passed</dt><dd id="escapes">—</dd></div>
+          <div><dt>Good parts rejected</dt><dd id="falseRejects">—</dd></div>
+          <div><dt>Parts missed</dt><dd id="missed">—</dd></div>
+          <div><dt>Detection recall</dt><dd id="recall">—</dd></div>
+          <div><dt>Detection time</dt><dd id="latency">—</dd></div>
+        </dl>
       </section>
 
-      <aside class="controls-panel" aria-labelledby="settings-heading">
-        <h2 id="settings-heading">Run</h2>
-        <form id="runForm" novalidate>
-          <fieldset class="option-group">
-            <legend>Lighting</legend>
-            <label class="scenario-option selected">
-              <input type="radio" name="scenario" value="nominal" checked>
-              <span><strong>Normal</strong><small>Even light</small></span>
-            </label>
-            <label class="scenario-option">
-              <input type="radio" name="scenario" value="poor_lighting">
-              <span><strong>Poor</strong><small>Moving spotlight, noise and blur</small></span>
-            </label>
-          </fieldset>
-
-          <fieldset class="option-group">
-            <legend>Detector</legend>
-            <label class="scenario-option selected">
-              <input type="radio" name="detector" value="classical" checked>
-              <span><strong>Classical rules</strong><small>Thresholds on size, color and the hole</small></span>
-            </label>
-            <label class="scenario-option">
-              <input type="radio" name="detector" value="cnn">
-              <span><strong>CNN</strong><small>Trained network, 145k parameters</small></span>
-            </label>
-          </fieldset>
-
-          <label class="field"><span>Frames</span><input id="frameCountInput" name="frame_count" type="number" min="8" max="240" step="1" value="96" required></label>
-
-          <details class="parameter-settings">
-            <summary>Rule thresholds</summary>
-            <p class="field-hint" id="detectorHint">These only affect the classical rules.</p>
-            <label class="range-field">
-              <span>Size tolerance <output id="dimensionToleranceOutput">18%</output></span>
-              <input id="dimensionToleranceInput" name="dimension_tolerance" type="range" min="0.05" max="0.50" value="0.18" step="0.01">
-            </label>
-            <label class="range-field">
-              <span>Color distance <output id="colorThresholdOutput">60</output></span>
-              <input id="colorThresholdInput" name="color_distance_threshold" type="range" min="10" max="150" value="60" step="1">
-            </label>
-            <div class="field-row">
-              <label class="field"><span>Hole radius min</span><input id="featureMinInput" name="feature_min_radius" type="number" min="2" max="30" value="6" step="1" required></label>
-              <label class="field"><span>Hole radius max</span><input id="featureMaxInput" name="feature_max_radius" type="number" min="3" max="40" value="14" step="1" required></label>
-            </div>
-            <div class="field-row">
-              <label class="field"><span>Expected width</span><input name="expected_width_px" type="number" min="20" max="200" value="80" required></label>
-              <label class="field"><span>Expected height</span><input name="expected_height_px" type="number" min="20" max="150" value="50" required></label>
-              <label class="field"><span>Min area</span><input name="min_part_area" type="number" min="100" max="10000" value="700" required></label>
-              <label class="field"><span>Max area</span><input name="max_part_area" type="number" min="1000" max="30000" value="9000" required></label>
-              <label class="field"><span>Min saturation</span><input name="segmentation_saturation_min" type="number" min="0" max="255" value="50" required></label>
-              <label class="field"><span>Min brightness</span><input name="segmentation_value_min" type="number" min="0" max="255" value="65" required></label>
-              <label class="field"><span>Morphology kernel</span><input name="morph_kernel_size" type="number" min="1" max="31" step="2" value="5" required></label>
-              <label class="field"><span>Border margin</span><input name="border_margin_px" type="number" min="0" max="30" value="2" required></label>
-            </div>
-          </details>
-
-          <div class="form-message" id="formMessage" role="alert" tabindex="-1" hidden></div>
-          <p class="compare-progress" id="compareProgress" role="status" aria-live="polite" hidden></p>
-          <p class="settings-state" id="settingsState" role="status">Not run yet.</p>
-          <div class="run-actions">
-            <button class="run-button" id="runButton" type="submit"><span class="button-label"><span>Run inspection</span></span></button>
-            <button class="compare-button" id="compareButton" type="button"><span>Compare lighting</span></button>
-          </div>
-        </form>
-      </aside>
-    </div>
-
-    <section class="failure-note" id="failureNote" hidden>
-      <div>
-        <h2>Poor light</h2>
-        <p id="failureNoteText">The color check uses a fixed threshold, so dimming pushes most parts past it and the rules reject them as the wrong color. Parts in the darkest stretch of belt are not found at all. Run the same scene with the CNN to compare.</p>
-      </div>
-      <button id="compareNominalButton" type="button">Compare with normal light</button>
-    </section>
-
-    <details class="secondary-section" aria-labelledby="telemetry-heading">
-      <summary><span id="telemetry-heading">Rejects by defect</span><small id="analyticsCaption">Counted up to the frame on screen</small></summary>
-      <div class="secondary-body">
-        <figure class="plot-block">
-          <figcaption><span>Rejected so far</span><span id="defectTotal">0 defects</span></figcaption>
-          <canvas id="defectChart" role="img" aria-label="Bar chart of rejects by defect type"></canvas>
-          <div class="chart-legend"><span><i class="dimension-color"></i>Size <b id="defectDimensionValue">0</b></span><span><i class="color-color"></i>Color <b id="defectColorValue">0</b></span><span><i class="feature-color"></i>Hole <b id="defectFeatureValue">0</b></span></div>
-        </figure>
-      </div>
-    </details>
-
-    <details class="secondary-section" id="comparisonPanel" aria-labelledby="comparison-heading">
-      <summary><span id="comparison-heading">Normal against poor light</span><small id="comparisonStatus">Not run yet</small></summary>
-      <div class="secondary-body">
-        <p class="comparison-empty" id="comparisonEmpty">Select Compare lighting to run both scenes with the same settings.</p>
-        <div class="table-wrap" id="comparisonTableWrap" tabindex="0" aria-label="Normal and poor light results" hidden>
-          <table class="data-table comparison-table"><caption>Change is poor light minus normal light.</caption><thead><tr><th scope="col">Result</th><th scope="col">Normal</th><th scope="col">Poor</th><th scope="col">Change</th></tr></thead><tbody id="comparisonTableBody"></tbody></table>
+      <section class="panel" aria-labelledby="parts-heading">
+        <div class="panel-heading">
+          <h2 id="parts-heading">Parts in this frame</h2>
+          <p class="muted"><span id="passedSoFar">0</span> passed and <span id="rejectedSoFar">0</span> rejected so far</p>
         </div>
-      </div>
-    </details>
+        <div class="table-wrap" tabindex="0" aria-label="Parts in this frame">
+          <table class="parts">
+            <thead><tr><th>Track</th><th>Decision</th><th>Defect</th><th>W × H</th><th>Color Δ</th><th>Hole r</th></tr></thead>
+            <tbody id="partsBody"></tbody>
+          </table>
+        </div>
+      </section>
 
-    <section class="run-output" aria-labelledby="downloads-heading">
-      <h2 id="downloads-heading">Download</h2>
-      <a id="csvExportButton" class="disabled" aria-disabled="true">Decision log (CSV)<span>One row per part, with its true label and the outcome</span></a>
+      <section class="note" id="poorLightNote" hidden>
+        <h2>Poor light</h2>
+        <p id="poorLightText"></p>
+      </section>
     </section>
+
+    <aside class="panel controls" aria-labelledby="run-heading">
+      <h2 id="run-heading">Run</h2>
+      <form id="runForm">
+        <fieldset>
+          <legend>Lighting</legend>
+          <label class="option"><input type="radio" name="scenario" value="nominal" checked><span><strong>Normal</strong><small>Even light</small></span></label>
+          <label class="option"><input type="radio" name="scenario" value="poor_lighting"><span><strong>Poor</strong><small>Moving spotlight, noise and blur</small></span></label>
+        </fieldset>
+        <fieldset>
+          <legend>Detector</legend>
+          <label class="option"><input type="radio" name="detector" value="classical" checked><span><strong>Classical rules</strong><small>Thresholds on size, color and the hole</small></span></label>
+          <label class="option"><input type="radio" name="detector" value="cnn"><span><strong>CNN</strong><small>Trained network, 145k parameters</small></span></label>
+        </fieldset>
+        <label class="field">Frames <input name="frame_count" type="number" min="8" max="240" value="96" required></label>
+        <details>
+          <summary>Rule thresholds</summary>
+          <p class="muted">These only affect the classical rules.</p>
+          <label class="field">Size tolerance <output id="toleranceValue">18%</output>
+            <input name="dimension_tolerance" type="range" min="0.05" max="0.5" step="0.01" value="0.18"></label>
+          <label class="field">Color distance <output id="colorValue">60</output>
+            <input name="color_distance_threshold" type="range" min="10" max="150" step="1" value="60"></label>
+          <label class="field">Minimum brightness <output id="brightnessValue">65</output>
+            <input name="segmentation_value_min" type="range" min="20" max="120" step="1" value="65"></label>
+        </details>
+        <p class="error" id="error" role="alert" hidden></p>
+        <button class="run-button" id="runButton" type="submit">Run inspection</button>
+        <a class="download disabled" id="download" aria-disabled="true">Download decision log (CSV)</a>
+      </form>
+    </aside>
   </main>
 
-  <p class="sr-only" id="runStatusLive" role="status" aria-live="polite" aria-atomic="true"></p>
   <script type="module" src="/static/app.js"></script>
 </body>
 </html>

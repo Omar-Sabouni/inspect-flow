@@ -17,21 +17,21 @@ Twenty test scenes, 220 parts per row (55 good, 165 defective):
 
 | Detector | Light | Right call | Defects passed | Good parts rejected | Parts missed | ms per frame |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Rules | Normal | 100% | 0 | 0 | 0 | 2.4 |
-| Rules | Poor | 46% | 0 | 28 | 91 | 1.7 |
-| CNN | Normal | 100% | 0 | 0 | 0 | 21.6 |
-| CNN | Poor | 100% | 0 | 0 | 0 | 23.4 |
+| Rules | Normal | 100% | 0 | 0 | 0 | 1.6 |
+| Rules | Poor | 46% | 0 | 28 | 91 | 1.3 |
+| CNN | Normal | 100% | 0 | 0 | 0 | 17.0 |
+| CNN | Poor | 100% | 0 | 0 | 0 | 18.1 |
 
 Time is the median on one core of an i7-13700H. With all cores the CNN takes
-7–8 ms.
+5–6 ms.
 
 The rules compare each part's mean color with a fixed reference. Under the
 moving spotlight most parts drift outside that tolerance, so good parts get
 rejected as the wrong color, and parts in the darkest stretch of belt never
 make it into the mask at all. The CNN was trained with random brightness,
 gradients, vignetting, noise and blur, but never with a spotlight, and it
-still calls every part. It costs about ten times the CPU, which still leaves
-room for a 30 fps camera on one core.
+still calls every part. It costs 10 to 15 times the CPU, which on one core
+still keeps up with a 50 fps camera.
 
 All of this is on synthetic scenes. I haven't run the CNN on camera footage.
 
@@ -118,8 +118,8 @@ A centroid tracker follows each part between frames using its last velocity.
 A track gets one decision, on the frame its center crosses the gate at a
 quarter of the frame width.
 
-Scoring matches detections to the truth with a min-cost flow on box overlap,
-and matches each gate decision to the part under it. Seeds 1000 and up are
+Scoring pairs detections with true parts greedily by box overlap, and
+matches each gate decision to the part under it. Seeds 1000 and up are
 for training, 100–104 for tuning, and 7–26 for the numbers above. The method
 is written up in [docs/evaluation.md](docs/evaluation.md).
 
@@ -136,5 +136,5 @@ python scripts/make_demo.py docs/images/poor-light-demo.webp   # needs ffmpeg
 ```
 
 CI runs ruff, mypy, pytest with a 90% coverage floor, Playwright with axe
-accessibility checks, pip-audit, a clean wheel install, and a Docker build that
-runs the CNN inside the container.
+accessibility checks, pip-audit, and a Docker build that runs the CNN inside
+the container.
