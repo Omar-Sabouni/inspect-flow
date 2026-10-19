@@ -4,7 +4,7 @@
 FROM python:3.12-slim AS build
 WORKDIR /src
 RUN python -m pip install --no-cache-dir "build>=1.2,<2"
-COPY pyproject.toml README.md app.py run.py ./
+COPY pyproject.toml README.md ./
 COPY inspectflow ./inspectflow
 RUN python -m build --wheel --outdir /dist
 

@@ -1,2 +1,0 @@
-# Editable application plus the test and development tool extras.
--e .[test,dev]

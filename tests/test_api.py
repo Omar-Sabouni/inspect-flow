@@ -8,8 +8,7 @@ from threading import Event, Thread
 import pytest
 from fastapi.testclient import TestClient
 
-from app import app
-from inspectflow.webapp import create_app
+from inspectflow.webapp import app, create_app
 
 
 @pytest.fixture()

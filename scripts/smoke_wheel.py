@@ -96,9 +96,7 @@ def main() -> None:
                 "-c",
                 (
                     "from importlib.resources import files; "
-                    "import app, run; "
                     "root = files('inspectflow') / 'static'; "
-                    "assert callable(app.create_app); "
                     "assert (root / 'index.html').is_file(); "
                     "assert (root / 'styles.css').is_file(); "
                     "assert (root / 'app.js').is_file(); "

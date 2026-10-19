@@ -31,6 +31,7 @@ train = [
 dev = [
   "build>=1.2,<2",
   "mypy>=1.15,<2",
+  "pillow>=10,<13",
   "pip-audit>=2.8,<3",
   "ruff>=0.11,<1",
   "setuptools>=68,<85",
@@ -42,7 +43,6 @@ inspect-flow = "inspectflow.cli:main"
 
 [tool.setuptools]
 include-package-data = true
-py-modules = ["app", "run"]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -77,14 +77,14 @@ skip_covered = true
 [tool.ruff]
 target-version = "py310"
 line-length = 88
-extend-exclude = ["artifacts"]
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["inspectflow", "app.py", "run.py", "scripts"]
+files = ["inspectflow", "scripts"]
 check_untyped_defs = true
 follow_imports = "skip"
 ignore_missing_imports = true
