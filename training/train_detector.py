@@ -16,7 +16,7 @@ Seeds are split three ways and the ranges must not overlap:
 Example::
 
     python -m pip install -e .[train]
-    python training/train_detector.py --steps 6000 --device cuda
+    python training/train_detector.py --device cuda
 
 The script writes ``inspectflow/models/part_detector.onnx`` and a JSON training
 record next to it. ``--evaluate-only`` skips training and re-scores the existing
@@ -364,8 +364,7 @@ def export_onnx(model: PartNet, path: Path) -> None:
     wrapper = ExportWrapper(model).eval().cpu()
     example = torch.zeros(1, 3, MODEL_INPUT_SIZE[1], MODEL_INPUT_SIZE[0])
     # The TorchScript exporter at opset 17 produces a graph that OpenCV's DNN
-    # importer reads. The newer dynamo exporter emits opset 18+ operators that
-    # OpenCV 4.x does not fully support.
+    # importer reads. The newer dynamo exporter has not been tried with OpenCV.
     torch.onnx.export(
         wrapper,
         (example,),
@@ -383,7 +382,7 @@ def export_onnx(model: PartNet, path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--steps", type=int, default=6000)
+    parser.add_argument("--steps", type=int, default=4000)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--learning-rate", type=float, default=2e-3)
     parser.add_argument("--workers", type=int, default=6)

@@ -1,123 +1,76 @@
-# How InspectFlow scores a run
+# How runs are scored
 
-Every frame comes from `SyntheticConveyor`, which records the true box and
-label of every fully visible part. InspectFlow compares its output with that
-record at two levels: per frame and at the inspection gate. The gate-level
-numbers are the ones a production line would care about.
+The generator records the box and label of every part that is fully in view,
+meaning at least 6 px inside the frame. Parts closer to the edge are drawn but
+not labelled. A seed fixes the whole part schedule, so a nominal run and a
+poor-light run with the same seed contain the same parts.
 
-## Ground truth
+## Per frame
 
-A part is labelled when its whole box is at least 6 px inside the frame. Parts
-closer to the edge are drawn but unlabelled, and are listed as
-`partial_boxes` so CNN training can ignore them.
+`evaluate_run` in `inspectflow/evaluation.py` matches detections to labelled
+parts in each frame at IoU 0.3 or more. It uses a min-cost flow, so it first
+maximises the number of matches and then their total IoU, and the result
+doesn't depend on detection order. From the matches it reports detection
+precision and recall, a four-class confusion matrix for the matched parts,
+and how often a part's track ID changes between frames.
 
-Each seed fixes the part schedule:
+## At the gate
 
-- Labels are dealt in blocks of four, one per class in random order.
-- Good parts vary by ±3 px in width, ±2 px in height and ±6 per color channel.
-- Dimension defects use one of four shapes, each at least 25% off nominal on
-  one axis. Color defects use one of three colors.
-- Spawn times jitter by ±1 frame.
+The gate is a vertical line a quarter of the way across the frame. A track
+gets one decision, on the first frame its center moves from left of the line
+to on or right of it. `evaluate_gate` matches each decision to the labelled
+part with the highest IoU in that frame and sorts it into one of these:
 
-The same seed gives the same schedule in both scenarios. Only the lighting
-differs, so nominal and poor-lighting runs compare like with like.
+- correct pass or correct reject
+- wrong defect: rejected, but for the wrong reason
+- escape: a defective part passed
+- false reject: a good part rejected
+- spurious: no part matches, or the part already had a decision
 
-## Per-frame metrics
+A part that crosses the line without any decision counts as missed.
 
-`evaluate_run` in `inspectflow/evaluation.py` matches detections to true parts
-in each frame with IoU ≥ 0.3. The matching is a min-cost flow, which first
-maximizes the number of matches and then the summed IoU, so it does not depend
-on detection order.
+"Right call" in the README is the share of parts at the gate with the right
+pass or reject verdict. Wrong-defect rejects count as right calls; missed
+parts count as wrong. Escapes and false rejects are reported separately
+because they cost different things on a real line: one ships a bad part, the
+other scraps a good one.
 
-| Metric | Definition |
-| --- | --- |
-| Detection precision, recall | Over all frames, from matched and unmatched boxes |
-| Defect class accuracy | Correct labels ÷ matched parts (four-class confusion matrix) |
-| Binary precision, recall, F1 | Defective vs normal, over matched parts |
-| Track continuity | 1 − ID switches ÷ frame-to-frame transitions of matched parts |
+The CSV that the dashboard exports has the matched part and the outcome on
+every row.
 
-## Gate metrics
+## Seeds
 
-The gate is a vertical line at 25% of the frame width. A track gets one
-decision, on the first frame its centroid moves from left of the line to on or
-right of it. `evaluate_gate` matches each decision to the true part with the
-highest IoU in the decision frame and assigns an outcome:
+- 7–26: test scenes, the numbers in the README. The dashboard shows seed 7.
+- 100–104: validation, used to pick the CNN's score threshold and border margin.
+- 1000 and up: CNN training.
 
-| Outcome | Meaning |
-| --- | --- |
-| Correct pass | Good part passed |
-| Correct reject | Defective part rejected for the right defect |
-| Wrong defect | Defective part rejected for a different defect |
-| Escape | Defective part passed |
-| False reject | Good part rejected |
-| Spurious | Decision with no matching part, or a second decision for one part |
-| Missed | Part crossed the gate but got no decision |
+Accuracy numbers are exactly repeatable for a given seed. Timing depends on
+the machine. `inspect-flow bench` regenerates
+[results/benchmark.md](results/benchmark.md), and
+`inspect-flow bench --threads 1` gives the single-core version.
 
-The summary rates are:
+## Flat-field correction
 
-| Rate | Numerator | Denominator |
-| --- | --- | --- |
-| Gate verdict accuracy | Right pass/fail verdicts: correct pass, correct reject, wrong defect | Parts at the gate (missed parts count as wrong) |
-| Escape rate | Escapes | Defective parts at the gate |
-| False reject rate | False rejects | Good parts at the gate |
-| Miss rate | Missed parts | Parts at the gate |
+`experiments/flat_field_correction.py` tests the standard fix for uneven light
+on the classical rules. It estimates the light field with a large median
+filter on a quarter-size brightness image, then scales every pixel so the belt
+returns to its normal brightness. Validation seeds 100–102:
 
-Escapes and false rejects carry different costs. An escape ships a bad part. A
-false reject scraps or reworks a good one. A real line would set the two
-thresholds separately, so InspectFlow reports both counts rather than one
-combined score.
-
-The dashboard shows these metrics for every run. The CSV decision log adds
-`truth_part_id`, `truth_defect` and `outcome` to every row.
-
-## Seeds and repeatability
-
-| Seeds | Role |
-| --- | --- |
-| 7–11 | Test. Reported numbers. The dashboard uses seed 7. |
-| 100–104 | Validation. CNN threshold and border margin were tuned here. |
-| ≥ 1000 | CNN training scenes |
-
-Generation is byte-for-byte deterministic for a given seed, so accuracy numbers
-repeat exactly. Latency numbers depend on the machine and its load.
-
-Run the benchmark:
-
-```bash
-inspect-flow bench                 # all CPU threads
-inspect-flow bench --threads 1     # closer to a small edge CPU
-inspect-flow bench --json out.json # also keep per-seed rows
-```
-
-## Negative result: flat-field correction
-
-Before comparing the rules with a CNN, it is fair to try the standard classical
-fix for uneven light. `experiments/flat_field_correction.py` estimates the
-light field with a large median filter and rescales each pixel so the belt
-returns to its nominal brightness. On validation seeds 100–102 it gave:
-
-| Lighting | Correction | Detection recall | Defect class accuracy | ms/frame |
+| Lighting | Correction | Detection recall | Class accuracy | ms per frame |
 | --- | --- | ---: | ---: | ---: |
-| Nominal | None | 99.9% | 100.0% | 2.73 |
-| Nominal | Flat-field | 99.9% | 100.0% | 7.81 |
-| Nominal | Bilateral filter, then flat-field | 99.9% | 100.0% | 22.60 |
-| Poor | None | 64.6% | 45.9% | 2.27 |
-| Poor | Flat-field | 88.9% | 42.7% | 8.04 |
-| Poor | Bilateral filter, then flat-field | 80.4% | 42.5% | 23.13 |
+| Normal | none | 99.9% | 100.0% | 2.7 |
+| Normal | flat-field | 99.9% | 100.0% | 7.8 |
+| Poor | none | 64.6% | 45.9% | 2.3 |
+| Poor | flat-field | 88.9% | 42.7% | 8.0 |
+| Poor | bilateral filter, then flat-field | 80.4% | 42.5% | 23.1 |
 
-Correction raises detection recall by 24 points, but classification does not
-improve. The gain that restores the belt's brightness also multiplies the
-sensor noise: on the darkest empty-belt patch, noise rises from σ 2.9 to σ 14.1
-gray levels. The belt already passes the saturation threshold (about 51
-against 50) and is kept out of the part mask only by the brightness threshold
-(about 60 against 65). Amplified noise lifts belt pixels around each part over
-that limit, and they join the part's mask. On seed
-100, the measured box of a good part grows by a median of 12 px in width and
-8 px in height, and 59% of good parts fall outside the ±18% size tolerance
-(16% without correction). Good parts that were rejected for color are now
-rejected for size. A bilateral filter before correction costs 15 ms per frame
-and does not help.
-
-The correction is not in the shipped pipeline. Retuning the segmentation
-thresholds for corrected frames might change the result. That has not been
+The correction finds more parts but classifies them no better. On the darkest
+empty stretch of belt it raises the noise from σ 2.9 to σ 14.1 gray levels.
+The belt passes the saturation threshold (about 51 against 50) and is held out
+of the mask only by the brightness threshold (about 60 against 65), so the
+noisy belt pixels next to each part join its mask. On seed 100 a good part's
+box grows by a median of 12 px in width and 8 px in height, and 59% of good
+parts end up outside the 18% size tolerance, against 16% without correction.
+Denoising first with a bilateral filter costs 15 ms per frame and doesn't
+help. Retuning the segmentation thresholds for corrected frames hasn't been
 tried.
