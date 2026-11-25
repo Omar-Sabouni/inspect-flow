@@ -9,8 +9,8 @@ const DEFECT_NAMES = {
   missing_feature: "no hole",
 };
 const POOR_LIGHT_NOTES = {
-  classical: "The rules reject most parts as the wrong color because the spotlight shifts their color, and they miss parts in the darkest stretch of belt. Run the CNN on this scene to compare.",
-  cnn: "Run the classical rules on this scene to compare.",
+  classical: "The spotlight shifts part colors, so the rules reject good parts and miss dark ones.",
+  cnn: "",
 };
 
 let run = null;
