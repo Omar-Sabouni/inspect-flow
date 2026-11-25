@@ -103,7 +103,7 @@ def _get_run(run_id: str) -> Run:
     with _runs_lock:
         run = _runs.get(run_id)
     if run is None:
-        raise HTTPException(404, "run not found or expired")
+        raise HTTPException(404, "This run has expired. Run the inspection again.")
     return run
 
 

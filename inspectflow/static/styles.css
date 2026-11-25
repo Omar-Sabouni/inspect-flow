@@ -254,6 +254,5 @@ summary { font-weight: 600; cursor: pointer; }
   .viewport { margin: 0 8px; }
   .transport { flex-wrap: wrap; }
   .transport input { flex-basis: 100%; order: 3; }
-  .flag span { display: none; }
   .record-body { grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 20px; }
 }

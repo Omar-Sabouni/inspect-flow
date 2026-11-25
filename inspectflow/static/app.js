@@ -9,8 +9,8 @@ const DEFECT_NAMES = {
   missing_feature: "no hole",
 };
 const POOR_LIGHT_NOTES = {
-  classical: "The color check uses a fixed threshold, so dimming pushes most parts past it and the rules reject them as the wrong color. Parts in the darkest stretch of belt are not found at all. Run the same scene with the CNN to compare.",
-  cnn: "The CNN was trained without this spotlight. Run the same scene with the classical rules to see where fixed thresholds break.",
+  classical: "The rules reject most parts as the wrong color because the spotlight shifts their color, and they miss parts in the darkest stretch of belt. Run the CNN on this scene to compare.",
+  cnn: "Run the classical rules on this scene to compare.",
 };
 
 let run = null;
@@ -47,8 +47,8 @@ async function startRun() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(settings),
     });
-    const body = await response.json();
-    if (!response.ok) throw new Error(describeError(body));
+    const body = await response.json().catch(() => null);
+    if (!response.ok || body === null) throw new Error(describeError(body, response.status));
     run = body;
     // Fetch every frame now so playback never waits on the network.
     run.frames.forEach((_, index) => { new Image().src = frameUrl(index); });
@@ -85,9 +85,20 @@ function readForm() {
   };
 }
 
-function describeError(body) {
-  if (Array.isArray(body.detail)) return body.detail.map((item) => item.msg).join("; ");
-  return body.detail || "The run failed.";
+const FIELD_NAMES = {
+  frame_count: "Frames",
+  dimension_tolerance: "Size tolerance",
+  color_distance_threshold: "Color distance",
+  segmentation_value_min: "Minimum brightness",
+};
+
+function describeError(body, status) {
+  if (Array.isArray(body?.detail)) {
+    return body.detail
+      .map((item) => `${FIELD_NAMES[item.loc?.at(-1)] ?? "Input"}: ${item.msg}.`)
+      .join(" ");
+  }
+  return body?.detail || `The server returned error ${status}. Check the terminal running inspect-flow.`;
 }
 
 function frameUrl(index) {
