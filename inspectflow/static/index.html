@@ -11,7 +11,6 @@
   <header class="app-bar">
     <div class="brand">
       <h1>InspectFlow</h1>
-      <p>Defect inspection on a simulated conveyor</p>
     </div>
     <span class="status" id="status" role="status"><i aria-hidden="true"></i><span>Starting</span></span>
   </header>
@@ -45,11 +44,11 @@
 
       <section class="record" aria-labelledby="score-heading">
         <div class="record-heading">
-          <h2 id="score-heading">Inspection record</h2>
+          <h2 id="score-heading">Score</h2>
           <p id="scoreContext" class="muted"></p>
         </div>
         <div class="record-body">
-          <p class="stamp" id="stamp"><span id="rightCall">—</span><small>right call</small></p>
+          <p class="stamp" id="stamp"><span id="rightCall">—</span><small>correct decisions</small></p>
           <dl class="tally">
             <div><dt>Defects passed</dt><dd id="escapes">—</dd></div>
             <div><dt>Good parts rejected</dt><dd id="falseRejects">—</dd></div>
@@ -63,7 +62,7 @@
       <section class="panel" aria-labelledby="parts-heading">
         <div class="panel-heading">
           <h2 id="parts-heading">In this frame</h2>
-          <p class="muted"><span id="passedSoFar">0</span> passed and <span id="rejectedSoFar">0</span> rejected so far</p>
+          <p class="muted">So far, <span id="passedSoFar">0</span> passed and <span id="rejectedSoFar">0</span> were rejected.</p>
         </div>
         <div class="table-wrap" tabindex="0" aria-label="Parts in this frame">
           <table class="parts">
